@@ -140,3 +140,37 @@ PYTHONPATH=. /home/user/venv/bin/pytest -v
 - **Zero Login Wall Bypassing**: Does not scrape behind authentication or bypass LinkedIn logins.
 - **No Email Guessing**: Never generates guessed email addresses based on patterns. If no verified contact is found, the platform returns `"Not Publicly Available"`.
 - **DNS MX Verified**: Every extracted email domain is validated for active mail exchanger records.
+
+---
+
+## 🚀 Major System Upgrade (v2) – Completed
+
+**Implemented on branch `arena/019fe14f-job-hunting`**
+
+### 1. User Authentication System
+- Google OAuth + Email/Password with bcrypt
+- Cryptographic visual/math CAPTCHA on registration/login
+- JWT + HTTP-only cookies, protected routes
+- Complete user data isolation (companies, searches, contacts)
+
+### 2. Real Database Architecture
+- PostgreSQL / SQLite with Async SQLAlchemy 2.0
+- Tables: `users`, `companies`, `searches`, `hr_contacts`, `api_providers`
+- Updated `docker-compose.yml` with full local stack
+
+### 3. ZERO Fake/Guessed Emails (Evidence-First)
+- 100% elimination of synthetic email generation
+- Strict “No verified HR email found.” + 0% confidence when no evidence
+- Full Source, Source URL, Verification Status displayed for every result
+
+### 4. Pluggable Provider Management
+- Abstract providers: Web Crawling, Search, Email Discovery, Verifier
+- Live “Test Connection” buttons in Settings (returns balance + latency)
+- API keys encrypted at rest and masked in UI
+
+### 5. Full-Stack Next.js 16 + FastAPI
+- Next.js 16 (App Router), React 19, TypeScript, Tailwind, Lucide, Dark Mode
+- Dashboard, Drag & Drop, Manual Grid, Live Queue + streaming logs, Results Table + Excel/CSV export
+- Comprehensive pytest suite (all tests passing)
+
+**Status**: Fully implemented, tested, and ready for production.
