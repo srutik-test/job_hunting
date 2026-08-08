@@ -1,0 +1,27 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///./data/hr_contacts.db
+      - CRAWLER_MAX_CONCURRENCY=5
+      - CRAWLER_TIMEOUT_SECONDS=15
+      - ENABLE_SEARCH_ENGINE=true
+    volumes:
+      - ./backend/data:/app/data
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8000/api/v1
+    depends_on:
+      - backend
+    restart: unless-stopped
