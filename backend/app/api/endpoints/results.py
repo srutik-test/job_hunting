@@ -1,6 +1,7 @@
 """
 Results endpoints: Querying, filtering, sorting, and single company inspection.
 """
+
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,8 +17,13 @@ router = APIRouter(prefix="/results", tags=["Results & Contact Intelligence"])
 
 @router.get("", response_model=ResultListResponse)
 async def get_results_list(
-    search: Optional[str] = Query(None, description="Search across company name, website, HR name, email, location"),
-    status: Optional[str] = Query(None, description="Filter by status (e.g. Verified Public HR Email)"),
+    search: Optional[str] = Query(
+        None,
+        description="Search across company name, website, HR name, email, location",
+    ),
+    status: Optional[str] = Query(
+        None, description="Filter by status (e.g. Verified Public HR Email)"
+    ),
     min_confidence: Optional[int] = Query(None, ge=0, le=100),
     has_hr_email: Optional[bool] = Query(None),
     job_id: Optional[str] = Query(None),
@@ -25,7 +31,7 @@ async def get_results_list(
     sort_order: str = Query("desc", description="asc or desc"),
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Paginated, searchable, and filterable results table endpoint.
@@ -47,13 +53,13 @@ async def get_results_list(
     if search and search.strip():
         term = f"%{search.strip()}%"
         stmt = stmt.where(
-            (ExtractionResult.company_name.ilike(term)) |
-            (ExtractionResult.website.ilike(term)) |
-            (ExtractionResult.location.ilike(term)) |
-            (ExtractionResult.hr_email.ilike(term)) |
-            (ExtractionResult.recruitment_email.ilike(term)) |
-            (ExtractionResult.hr_name.ilike(term)) |
-            (ExtractionResult.hr_position.ilike(term))
+            (ExtractionResult.company_name.ilike(term))
+            | (ExtractionResult.website.ilike(term))
+            | (ExtractionResult.location.ilike(term))
+            | (ExtractionResult.hr_email.ilike(term))
+            | (ExtractionResult.recruitment_email.ilike(term))
+            | (ExtractionResult.hr_name.ilike(term))
+            | (ExtractionResult.hr_position.ilike(term))
         )
 
     # Count total
@@ -82,7 +88,7 @@ async def get_results_list(
         total=total,
         page=page,
         page_size=page_size,
-        total_pages=total_pages
+        total_pages=total_pages,
     )
 
 

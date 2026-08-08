@@ -17,7 +17,8 @@ export interface CompanyUploadPreview {
 
 export interface JobProgress {
   id: string;
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | 'paused';
+  status:
+    "pending" | "running" | "completed" | "failed" | "cancelled" | "paused";
   total_companies: number;
   processed_companies: number;
   progress_percentage: number;
@@ -34,7 +35,7 @@ export interface JobProgress {
 
 export interface JobLog {
   job_id: string;
-  level: 'INFO' | 'WARNING' | 'ERROR' | 'DEBUG';
+  level: "INFO" | "WARNING" | "ERROR" | "DEBUG";
   message: string;
   timestamp: string;
   metadata?: Record<string, any>;

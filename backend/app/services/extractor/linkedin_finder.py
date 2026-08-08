@@ -4,6 +4,7 @@ Locates publicly indexed HR Managers, Recruiters, and Talent Specialists for the
 using public search snippets, team bios, structured metadata, and public indices.
 Strictly collects only public data without fabricating or bypassing authentication.
 """
+
 import re
 from typing import List, Optional, Tuple, Dict, Any
 from pydantic import BaseModel
@@ -19,14 +20,32 @@ class PublicHRProfile(BaseModel):
 
 # HR / Recruiter target roles
 HR_ROLE_KEYWORDS = [
-    "Head of HR", "HR Director", "HR Manager", "Human Resources Manager",
-    "Human Resources Director", "VP of People", "Chief People Officer",
-    "Director of People", "Talent Acquisition Manager", "Talent Acquisition Lead",
-    "Talent Acquisition Specialist", "Senior Recruiter", "Technical Recruiter",
-    "Lead Recruiter", "Corporate Recruiter", "HR Executive", "Recruitment Lead",
-    "Recruitment Specialist", "Talent Partner", "People Operations Manager",
-    "People Operations Lead", "Hiring Manager", "HR Generalist",
-    "Human Resources Business Partner", "HRBP", "Recruitment Coordinator"
+    "Head of HR",
+    "HR Director",
+    "HR Manager",
+    "Human Resources Manager",
+    "Human Resources Director",
+    "VP of People",
+    "Chief People Officer",
+    "Director of People",
+    "Talent Acquisition Manager",
+    "Talent Acquisition Lead",
+    "Talent Acquisition Specialist",
+    "Senior Recruiter",
+    "Technical Recruiter",
+    "Lead Recruiter",
+    "Corporate Recruiter",
+    "HR Executive",
+    "Recruitment Lead",
+    "Recruitment Specialist",
+    "Talent Partner",
+    "People Operations Manager",
+    "People Operations Lead",
+    "Hiring Manager",
+    "HR Generalist",
+    "Human Resources Business Partner",
+    "HRBP",
+    "Recruitment Coordinator",
 ]
 
 
@@ -38,7 +57,7 @@ class LinkedInFinder:
         text: str,
         company_name: str,
         page_url: str = "",
-        discovered_linkedin_urls: Optional[List[str]] = None
+        discovered_linkedin_urls: Optional[List[str]] = None,
     ) -> List[PublicHRProfile]:
         """
         Extract publicly declared HR personnel from crawled team/about/leadership text and schema.
@@ -50,39 +69,54 @@ class LinkedInFinder:
         for role in HR_ROLE_KEYWORDS:
             # Pattern: Name - Role or Role: Name or Name, Role
             patterns = [
-                re.compile(rf"([A-Z][a-z]+(?:\s+[A-Z][a-z]+){{1,2}})\s*(?:[-–—|•,]\s*|\s+is\s+(?:the\s+)?|\s+at\s+{re.escape(company_name)}\s+)?\s*{re.escape(role)}", re.IGNORECASE),
-                re.compile(rf"{re.escape(role)}\s*(?:[-–—|•,:]\s*|\s+at\s+{re.escape(company_name)}\s+)?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){{1,2}})", re.IGNORECASE),
+                re.compile(
+                    rf"([A-Z][a-z]+(?:\s+[A-Z][a-z]+){{1,2}})\s*(?:[-–—|•,]\s*|\s+is\s+(?:the\s+)?|\s+at\s+{re.escape(company_name)}\s+)?\s*{re.escape(role)}",
+                    re.IGNORECASE,
+                ),
+                re.compile(
+                    rf"{re.escape(role)}\s*(?:[-–—|•,:]\s*|\s+at\s+{re.escape(company_name)}\s+)?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){{1,2}})",
+                    re.IGNORECASE,
+                ),
             ]
 
             for pat in patterns:
                 for match in pat.finditer(text):
                     candidate_name = match.group(1).strip()
-                    if LinkedInFinder._is_valid_person_name(candidate_name, company_name):
+                    if LinkedInFinder._is_valid_person_name(
+                        candidate_name, company_name
+                    ):
                         # Match with discovered LinkedIn profile URL if available
                         matched_url = "Not Publicly Available"
                         for li_url in discovered_urls:
                             if "/in/" in li_url:
                                 name_slug = candidate_name.lower().replace(" ", "-")
-                                if name_slug in li_url.lower() or candidate_name.split()[0].lower() in li_url.lower():
+                                if (
+                                    name_slug in li_url.lower()
+                                    or candidate_name.split()[0].lower()
+                                    in li_url.lower()
+                                ):
                                     matched_url = li_url
                                     break
 
-                        profiles.append(PublicHRProfile(
-                            name=candidate_name,
-                            job_title=role,
-                            linkedin_profile_url=matched_url,
-                            source=page_url or "Company Public Team Page",
-                            confidence=90 if matched_url != "Not Publicly Available" else 80
-                        ))
+                        profiles.append(
+                            PublicHRProfile(
+                                name=candidate_name,
+                                job_title=role,
+                                linkedin_profile_url=matched_url,
+                                source=page_url or "Company Public Team Page",
+                                confidence=(
+                                    90
+                                    if matched_url != "Not Publicly Available"
+                                    else 80
+                                ),
+                            )
+                        )
 
         return profiles
 
     @staticmethod
     def parse_public_search_snippet(
-        title: str,
-        snippet: str,
-        profile_url: str,
-        company_name: str
+        title: str, snippet: str, profile_url: str, company_name: str
     ) -> Optional[PublicHRProfile]:
         """
         Parse a public search engine snippet for a LinkedIn profile.
@@ -93,7 +127,9 @@ class LinkedInFinder:
             return None
 
         # Clean title
-        clean_title = title.replace(" - LinkedIn", "").replace(" | LinkedIn", "").strip()
+        clean_title = (
+            title.replace(" - LinkedIn", "").replace(" | LinkedIn", "").strip()
+        )
         parts = re.split(r"\s*[-–—|•]\s*", clean_title)
 
         name = ""
@@ -105,8 +141,15 @@ class LinkedInFinder:
 
             # Check if title matches HR keywords
             for role in HR_ROLE_KEYWORDS:
-                if role.lower() in potential_title.lower() or role.lower() in snippet.lower():
-                    job_title = role if role.lower() in potential_title.lower() else potential_title
+                if (
+                    role.lower() in potential_title.lower()
+                    or role.lower() in snippet.lower()
+                ):
+                    job_title = (
+                        role
+                        if role.lower() in potential_title.lower()
+                        else potential_title
+                    )
                     break
         elif len(parts) == 1:
             name = parts[0].strip()
@@ -115,7 +158,11 @@ class LinkedInFinder:
                     job_title = role
                     break
 
-        if name and job_title and LinkedInFinder._is_valid_person_name(name, company_name):
+        if (
+            name
+            and job_title
+            and LinkedInFinder._is_valid_person_name(name, company_name)
+        ):
             # Clean profile url
             clean_url = profile_url.split("?")[0].rstrip("/")
             return PublicHRProfile(
@@ -123,7 +170,7 @@ class LinkedInFinder:
                 job_title=job_title,
                 linkedin_profile_url=clean_url,
                 source=f"Public LinkedIn Index ({clean_url})",
-                confidence=90
+                confidence=90,
             )
 
         return None
@@ -142,10 +189,23 @@ class LinkedInFinder:
 
         # Common stop words
         blacklisted = {
-            "about us", "contact us", "careers", "our team", "leadership team",
-            "privacy policy", "terms of service", "home page", "learn more",
-            "read more", "view profile", "apply now", "get started", "we are hiring",
-            "all rights reserved", "linkedin profile", "company page"
+            "about us",
+            "contact us",
+            "careers",
+            "our team",
+            "leadership team",
+            "privacy policy",
+            "terms of service",
+            "home page",
+            "learn more",
+            "read more",
+            "view profile",
+            "apply now",
+            "get started",
+            "we are hiring",
+            "all rights reserved",
+            "linkedin profile",
+            "company page",
         }
         if name.lower() in blacklisted:
             return False

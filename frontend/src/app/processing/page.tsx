@@ -1,26 +1,31 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { 
-  Activity, 
-  ArrowRight, 
-  RefreshCw, 
-  Table2, 
-  AlertCircle, 
+import React, { useState, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import {
+  Activity,
+  ArrowRight,
+  RefreshCw,
+  Table2,
+  AlertCircle,
   CheckCircle2,
-  Play
-} from 'lucide-react';
-import LiveProgressBar from '../../components/queue/LiveProgressBar';
-import LiveLogViewer from '../../components/queue/LiveLogViewer';
-import { fetchJobProgress, fetchJobLogs, cancelJob, fetchStats } from '../../lib/api';
-import { JobProgress, JobLog } from '../../types';
+  Play,
+} from "lucide-react";
+import LiveProgressBar from "../../components/queue/LiveProgressBar";
+import LiveLogViewer from "../../components/queue/LiveLogViewer";
+import {
+  fetchJobProgress,
+  fetchJobLogs,
+  cancelJob,
+  fetchStats,
+} from "../../lib/api";
+import { JobProgress, JobLog } from "../../types";
 
 function ProcessingContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const initialJobId = searchParams.get('job_id');
+  const initialJobId = searchParams.get("job_id");
 
   const [activeJobId, setActiveJobId] = useState<string | null>(initialJobId);
   const [progress, setProgress] = useState<JobProgress | null>(null);
@@ -68,13 +73,17 @@ function ProcessingContent() {
           setError(null);
           setLoading(false);
 
-          if (prog.status === 'completed' || prog.status === 'failed' || prog.status === 'cancelled') {
+          if (
+            prog.status === "completed" ||
+            prog.status === "failed" ||
+            prog.status === "cancelled"
+          ) {
             clearInterval(intervalId);
           }
         }
       } catch (err: any) {
         if (!isCancelled) {
-          setError(err.message || 'Error polling job progress');
+          setError(err.message || "Error polling job progress");
           setLoading(false);
         }
       }
@@ -96,13 +105,12 @@ function ProcessingContent() {
       const updated = await fetchJobProgress(activeJobId);
       setProgress(updated);
     } catch (e: any) {
-      alert(e.message || 'Failed to cancel job');
+      alert(e.message || "Failed to cancel job");
     }
   };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
-      
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -111,11 +119,12 @@ function ProcessingContent() {
             <span>Live Extraction & Verification Queue</span>
           </h1>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Real-time multi-threaded crawl progress, subpage navigation, and DNS MX verification trace.
+            Real-time multi-threaded crawl progress, subpage navigation, and DNS
+            MX verification trace.
           </p>
         </div>
 
-        {progress?.status === 'completed' && (
+        {progress?.status === "completed" && (
           <Link
             href="/results"
             className="inline-flex items-center space-x-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-700 transition"
@@ -137,7 +146,9 @@ function ProcessingContent() {
       {loading ? (
         <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-12 text-center text-slate-400">
           <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-3 text-blue-500" />
-          <p className="text-sm font-medium">Connecting to live extraction queue...</p>
+          <p className="text-sm font-medium">
+            Connecting to live extraction queue...
+          </p>
         </div>
       ) : !activeJobId || !progress ? (
         <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-12 text-center space-y-4">
@@ -145,9 +156,12 @@ function ProcessingContent() {
             <Activity className="h-6 w-6" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">No Active Extraction Running</h3>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">
+              No Active Extraction Running
+            </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mt-1">
-              Upload a company list or manually enter companies to start discovering verified public HR contacts.
+              Upload a company list or manually enter companies to start
+              discovering verified public HR contacts.
             </p>
           </div>
           <div className="flex justify-center gap-3">
@@ -174,14 +188,19 @@ function ProcessingContent() {
           <LiveLogViewer logs={logs} onClear={() => setLogs([])} />
         </div>
       )}
-
     </div>
   );
 }
 
 export default function ProcessingPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-slate-400">Loading live queue...</div>}>
+    <Suspense
+      fallback={
+        <div className="p-8 text-center text-slate-400">
+          Loading live queue...
+        </div>
+      }
+    >
       <ProcessingContent />
     </Suspense>
   );

@@ -1,6 +1,7 @@
 """
 Integration tests for FastAPI endpoints using TestClient.
 """
+
 import pytest
 from starlette.testclient import TestClient
 from app.main import app
@@ -46,12 +47,12 @@ def test_manual_start_extraction(client):
                 "name": "Aspire Softserv",
                 "location": "Ahmedabad",
                 "website": "https://aspiresoftserv.com",
-                "linkedin_url": "https://linkedin.com/company/aspire-softserv"
+                "linkedin_url": "https://linkedin.com/company/aspire-softserv",
             }
         ],
         "crawler_engine": "auto",
         "enable_public_search": False,
-        "max_pages_per_company": 5
+        "max_pages_per_company": 5,
     }
     response = client.post("/api/v1/companies/manual-start", json=payload)
     assert response.status_code == 200

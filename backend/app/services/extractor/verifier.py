@@ -4,6 +4,7 @@ Performs RFC syntax validation, DNS MX record verification,
 source integrity verification, and status classification.
 Guarantees NO fabricated or pattern-inferred data.
 """
+
 import re
 from typing import Dict, Any, Optional, Tuple
 import dns.resolver
@@ -49,11 +50,11 @@ class ContactVerifier:
         general_email: str,
         hr_profile_url: str,
         source: str,
-        base_confidence: int = 0
+        base_confidence: int = 0,
     ) -> Tuple[str, int]:
         """
         Determine official verification status and final confidence score.
-        
+
         Statuses:
         - Verified Public HR Email (90-95%)
         - Verified Recruitment Email (85-90%)
@@ -65,7 +66,7 @@ class ContactVerifier:
         if hr_email and hr_email != "Not Publicly Available":
             domain = hr_email.split("@")[-1] if "@" in hr_email else ""
             mx_valid = cls.verify_domain_mx(domain) if domain else False
-            
+
             if "career" in source.lower() or "official" in source.lower():
                 score = 95 if mx_valid else 90
             elif "linkedin" in source.lower():
@@ -76,9 +77,13 @@ class ContactVerifier:
 
         # Case 2: Verified Recruitment Email
         if recruitment_email and recruitment_email != "Not Publicly Available":
-            domain = recruitment_email.split("@")[-1] if "@" in recruitment_email else ""
+            domain = (
+                recruitment_email.split("@")[-1] if "@" in recruitment_email else ""
+            )
             mx_valid = cls.verify_domain_mx(domain) if domain else False
-            score = 90 if "official" in source.lower() or "career" in source.lower() else 85
+            score = (
+                90 if "official" in source.lower() or "career" in source.lower() else 85
+            )
             return "Verified Recruitment Email", score
 
         # Case 3: Verified Careers Email

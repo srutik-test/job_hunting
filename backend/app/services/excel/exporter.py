@@ -3,6 +3,7 @@ Excel and CSV Exporter module.
 Generates structured Excel (.xlsx) and CSV exports with styling,
 verification statuses, and confidence ratings.
 """
+
 import io
 from typing import List, Dict, Any
 from datetime import datetime, timezone
@@ -44,9 +45,13 @@ class ExcelExporter:
         ws.append(headers)
 
         # Style headers
-        header_fill = PatternFill(start_color="0F172A", end_color="0F172A", fill_type="solid")
+        header_fill = PatternFill(
+            start_color="0F172A", end_color="0F172A", fill_type="solid"
+        )
         header_font = Font(name="Segoe UI", size=11, bold=True, color="FFFFFF")
-        center_align = Alignment(horizontal="center", vertical="center", wrap_text=False)
+        center_align = Alignment(
+            horizontal="center", vertical="center", wrap_text=False
+        )
 
         for col_idx in range(1, len(headers) + 1):
             cell = ws.cell(row=1, column=col_idx)
@@ -55,13 +60,15 @@ class ExcelExporter:
             cell.alignment = center_align
 
         # Add data rows
-        row_alt_fill = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid")
+        row_alt_fill = PatternFill(
+            start_color="F8FAFC", end_color="F8FAFC", fill_type="solid"
+        )
         regular_font = Font(name="Segoe UI", size=10)
         thin_border = Border(
-            left=Side(style='thin', color='E2E8F0'),
-            right=Side(style='thin', color='E2E8F0'),
-            top=Side(style='thin', color='E2E8F0'),
-            bottom=Side(style='thin', color='E2E8F0')
+            left=Side(style="thin", color="E2E8F0"),
+            right=Side(style="thin", color="E2E8F0"),
+            top=Side(style="thin", color="E2E8F0"),
+            bottom=Side(style="thin", color="E2E8F0"),
         )
 
         for row_idx, r in enumerate(results, start=2):
@@ -77,11 +84,11 @@ class ExcelExporter:
                     except Exception:
                         pass
                 row_data.append(val if val is not None else "Not Publicly Available")
-            
+
             ws.append(row_data)
 
             # Apply row styling
-            is_alt = (row_idx % 2 == 0)
+            is_alt = row_idx % 2 == 0
             for col_idx in range(1, len(headers) + 1):
                 cell = ws.cell(row=row_idx, column=col_idx)
                 cell.font = regular_font

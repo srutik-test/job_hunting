@@ -1,11 +1,12 @@
-import type { Metadata } from 'next';
-import './globals.css';
-import Navbar from '../components/layout/Navbar';
-import Sidebar from '../components/layout/Sidebar';
+import type { Metadata } from "next";
+import "./globals.css";
+import Navbar from "../components/layout/Navbar";
+import Sidebar from "../components/layout/Sidebar";
 
 export const metadata: Metadata = {
-  title: 'HR & Recruitment Contact Intelligence Platform',
-  description: 'Production-ready platform to extract verified public HR and recruitment contacts from company websites and public LinkedIn profiles.',
+  title: "HR & Recruitment Contact Intelligence Platform",
+  description:
+    "Production-ready platform to extract verified public HR and recruitment contacts from company websites and public LinkedIn profiles.",
 };
 
 export default function RootLayout({

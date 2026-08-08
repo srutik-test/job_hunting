@@ -1,6 +1,7 @@
 """
 Unit tests for Excel/CSV import and export.
 """
+
 import pytest
 from app.services.excel.importer import ExcelImporter
 from app.services.excel.exporter import ExcelExporter
@@ -45,7 +46,7 @@ def test_excel_export():
             "source": "Official Careers Page",
             "confidence_score": 95,
             "status": "Verified Public HR Email",
-            "created_at": "2026-08-07T12:00:00Z"
+            "created_at": "2026-08-07T12:00:00Z",
         }
     ]
 

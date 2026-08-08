@@ -1,6 +1,7 @@
 """
 Structured logging module with live streaming and job-specific log buffering.
 """
+
 import logging
 import sys
 from datetime import datetime, timezone
@@ -15,7 +16,14 @@ _MAX_LOGS_PER_JOB = 500
 
 class JobLogEntry:
     """Structured representation of a single log message."""
-    def __init__(self, job_id: str, level: str, message: str, metadata: Optional[Dict[str, Any]] = None):
+
+    def __init__(
+        self,
+        job_id: str,
+        level: str,
+        message: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ):
         self.job_id = job_id
         self.level = level
         self.message = message
@@ -28,35 +36,41 @@ class JobLogEntry:
             "level": self.level,
             "message": self.message,
             "timestamp": self.timestamp,
-            "metadata": self.metadata
+            "metadata": self.metadata,
         }
 
 
-def add_job_log(job_id: str, level: str, message: str, metadata: Optional[Dict[str, Any]] = None) -> JobLogEntry:
+def add_job_log(
+    job_id: str, level: str, message: str, metadata: Optional[Dict[str, Any]] = None
+) -> JobLogEntry:
     """Record a structured log message for a specific job."""
     if job_id not in _JOB_LOGS:
         _JOB_LOGS[job_id] = deque(maxlen=_MAX_LOGS_PER_JOB)
-    
-    entry = JobLogEntry(job_id=job_id, level=level.upper(), message=message, metadata=metadata)
+
+    entry = JobLogEntry(
+        job_id=job_id, level=level.upper(), message=message, metadata=metadata
+    )
     _JOB_LOGS[job_id].append(entry)
-    
+
     # Also forward to python root logger
     logger = logging.getLogger("hr_extractor")
     log_func = getattr(logger, level.lower(), logger.info)
     log_func(f"[{job_id[:8]}] {message}")
-    
+
     return entry
 
 
-def get_job_logs(job_id: str, limit: int = 200, since_timestamp: Optional[str] = None) -> List[Dict[str, Any]]:
+def get_job_logs(
+    job_id: str, limit: int = 200, since_timestamp: Optional[str] = None
+) -> List[Dict[str, Any]]:
     """Retrieve logs for a job, optionally filtered by timestamp."""
     if job_id not in _JOB_LOGS:
         return []
-    
+
     logs = list(_JOB_LOGS[job_id])
     if since_timestamp:
         logs = [log for log in logs if log.timestamp > since_timestamp]
-    
+
     return [log.to_dict() for log in logs[-limit:]]
 
 
@@ -70,7 +84,7 @@ def clear_job_logs(job_id: str) -> None:
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)]
+    handlers=[logging.StreamHandler(sys.stdout)],
 )
 
 logger = logging.getLogger("hr_extractor")

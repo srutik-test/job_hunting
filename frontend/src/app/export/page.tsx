@@ -1,22 +1,26 @@
-'use client';
+"use client";
 
-import React from 'react';
-import { 
-  Download, 
-  FileSpreadsheet, 
-  FileText, 
-  Layers, 
-  ShieldCheck, 
-  CheckCircle2, 
-  Sparkles, 
-  ExternalLink 
-} from 'lucide-react';
-import { getExcelExportUrl, getCsvExportUrl, getSampleExcelUrl, getSampleCsvUrl } from '../../lib/api';
+import React from "react";
+import {
+  Download,
+  FileSpreadsheet,
+  FileText,
+  Layers,
+  ShieldCheck,
+  CheckCircle2,
+  Sparkles,
+  ExternalLink,
+} from "lucide-react";
+import {
+  getExcelExportUrl,
+  getCsvExportUrl,
+  getSampleExcelUrl,
+  getSampleCsvUrl,
+} from "../../lib/api";
 
 export default function ExportPage() {
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
-      
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center space-x-2.5">
@@ -24,13 +28,13 @@ export default function ExportPage() {
           <span>Export Center & Import Templates</span>
         </h1>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          Download formatted results in Excel (.xlsx) and CSV formats, or grab official sample import templates.
+          Download formatted results in Excel (.xlsx) and CSV formats, or grab
+          official sample import templates.
         </p>
       </div>
 
       {/* Export Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
         {/* Card 1: Results Intelligence Export */}
         <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xs space-y-4">
           <div className="flex items-center space-x-3">
@@ -38,13 +42,20 @@ export default function ExportPage() {
               <FileSpreadsheet className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Export Discovered Results</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Download all verified public HR contacts</p>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                Export Discovered Results
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Download all verified public HR contacts
+              </p>
             </div>
           </div>
 
           <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-            Includes all 14 structured columns: Company Name, Location, Website, LinkedIn URL, HR Email, Recruitment Email, Careers Email, General Email, HR Name, HR Position, LinkedIn Profile URL, Confidence Score, Verification Status, and Extraction Date.
+            Includes all 14 structured columns: Company Name, Location, Website,
+            LinkedIn URL, HR Email, Recruitment Email, Careers Email, General
+            Email, HR Name, HR Position, LinkedIn Profile URL, Confidence Score,
+            Verification Status, and Extraction Date.
           </p>
 
           <div className="flex flex-wrap gap-3 pt-2">
@@ -75,13 +86,20 @@ export default function ExportPage() {
               <Download className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Sample Import Templates</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Download formatted upload templates with examples</p>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                Sample Import Templates
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Download formatted upload templates with examples
+              </p>
             </div>
           </div>
 
           <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-            Pre-formatted with the exact columns recognized by our parser (Company Name, Location, Website, LinkedIn URL) with pre-filled examples like Aspire Softserv, Simform, Bacancy Technology, Radixweb, and TatvaSoft.
+            Pre-formatted with the exact columns recognized by our parser
+            (Company Name, Location, Website, LinkedIn URL) with pre-filled
+            examples like Aspire Softserv, Simform, Bacancy Technology,
+            Radixweb, and TatvaSoft.
           </p>
 
           <div className="flex flex-wrap gap-3 pt-2">
@@ -104,14 +122,17 @@ export default function ExportPage() {
             </a>
           </div>
         </div>
-
       </div>
 
       {/* Schema / Columns Reference Table */}
       <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-xs">
         <div className="border-b border-slate-200 dark:border-slate-800 px-6 py-4 bg-slate-50/50 dark:bg-slate-800/50">
-          <h3 className="text-sm font-bold text-slate-900 dark:text-white">Exported Schema & Column Definitions</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">All fields guaranteed strictly public and traceable</p>
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+            Exported Schema & Column Definitions
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            All fields guaranteed strictly public and traceable
+          </p>
         </div>
 
         <div className="overflow-x-auto">
@@ -126,52 +147,79 @@ export default function ExportPage() {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               <tr>
-                <td className="px-6 py-2.5 font-semibold text-slate-900 dark:text-white">Company Name</td>
+                <td className="px-6 py-2.5 font-semibold text-slate-900 dark:text-white">
+                  Company Name
+                </td>
                 <td className="px-6 py-2.5 font-mono text-[10px]">String</td>
                 <td className="px-6 py-2.5">Aspire Softserv</td>
-                <td className="px-6 py-2.5">Target company organization name</td>
+                <td className="px-6 py-2.5">
+                  Target company organization name
+                </td>
               </tr>
               <tr>
-                <td className="px-6 py-2.5 font-semibold text-slate-900 dark:text-white">Location</td>
+                <td className="px-6 py-2.5 font-semibold text-slate-900 dark:text-white">
+                  Location
+                </td>
                 <td className="px-6 py-2.5 font-mono text-[10px]">String</td>
                 <td className="px-6 py-2.5">Ahmedabad</td>
                 <td className="px-6 py-2.5">Headquarters or branch city</td>
               </tr>
               <tr>
-                <td className="px-6 py-2.5 font-semibold text-slate-900 dark:text-white">Website</td>
+                <td className="px-6 py-2.5 font-semibold text-slate-900 dark:text-white">
+                  Website
+                </td>
                 <td className="px-6 py-2.5 font-mono text-[10px]">URL</td>
-                <td className="px-6 py-2.5 font-mono text-blue-500">https://aspiresoftserv.com</td>
+                <td className="px-6 py-2.5 font-mono text-blue-500">
+                  https://aspiresoftserv.com
+                </td>
                 <td className="px-6 py-2.5">Official company domain</td>
               </tr>
               <tr>
-                <td className="px-6 py-2.5 font-semibold text-slate-900 dark:text-white">HR Email</td>
+                <td className="px-6 py-2.5 font-semibold text-slate-900 dark:text-white">
+                  HR Email
+                </td>
                 <td className="px-6 py-2.5 font-mono text-[10px]">Email</td>
-                <td className="px-6 py-2.5 font-mono text-emerald-500">hr@aspiresoftserv.com</td>
-                <td className="px-6 py-2.5">Direct public HR inbox or "Not Publicly Available"</td>
+                <td className="px-6 py-2.5 font-mono text-emerald-500">
+                  hr@aspiresoftserv.com
+                </td>
+                <td className="px-6 py-2.5">
+                  Direct public HR inbox or "Not Publicly Available"
+                </td>
               </tr>
               <tr>
-                <td className="px-6 py-2.5 font-semibold text-slate-900 dark:text-white">Recruitment Email</td>
+                <td className="px-6 py-2.5 font-semibold text-slate-900 dark:text-white">
+                  Recruitment Email
+                </td>
                 <td className="px-6 py-2.5 font-mono text-[10px]">Email</td>
-                <td className="px-6 py-2.5 font-mono text-blue-500">recruitment@aspiresoftserv.com</td>
+                <td className="px-6 py-2.5 font-mono text-blue-500">
+                  recruitment@aspiresoftserv.com
+                </td>
                 <td className="px-6 py-2.5">Talent acquisition inbox</td>
               </tr>
               <tr>
-                <td className="px-6 py-2.5 font-semibold text-slate-900 dark:text-white">Confidence Score</td>
+                <td className="px-6 py-2.5 font-semibold text-slate-900 dark:text-white">
+                  Confidence Score
+                </td>
                 <td className="px-6 py-2.5 font-mono text-[10px]">Integer</td>
                 <td className="px-6 py-2.5">95%</td>
-                <td className="px-6 py-2.5">Traceable confidence metric (95%, 90%, 85%, 70%, 0%)</td>
+                <td className="px-6 py-2.5">
+                  Traceable confidence metric (95%, 90%, 85%, 70%, 0%)
+                </td>
               </tr>
               <tr>
-                <td className="px-6 py-2.5 font-semibold text-slate-900 dark:text-white">Verification Status</td>
+                <td className="px-6 py-2.5 font-semibold text-slate-900 dark:text-white">
+                  Verification Status
+                </td>
                 <td className="px-6 py-2.5 font-mono text-[10px]">Enum</td>
                 <td className="px-6 py-2.5">Verified Public HR Email</td>
-                <td className="px-6 py-2.5">Official verification classification</td>
+                <td className="px-6 py-2.5">
+                  Official verification classification
+                </td>
               </tr>
             </tbody>
           </table>
         </div>
       </div>
-
     </div>
   );
 }

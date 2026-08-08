@@ -1,21 +1,21 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { 
-  Building2, 
-  Moon, 
-  Sun, 
-  Download, 
-  FileSpreadsheet, 
-  Sparkles, 
-  CheckCircle2, 
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  Building2,
+  Moon,
+  Sun,
+  Download,
+  FileSpreadsheet,
+  Sparkles,
+  CheckCircle2,
   Terminal,
   Layers,
-  Search
-} from 'lucide-react';
-import { getSampleExcelUrl, getSampleCsvUrl } from '../../lib/api';
+  Search,
+} from "lucide-react";
+import { getSampleExcelUrl, getSampleCsvUrl } from "../../lib/api";
 
 export default function Navbar() {
   const [darkMode, setDarkMode] = useState<boolean>(true);
@@ -23,12 +23,12 @@ export default function Navbar() {
 
   useEffect(() => {
     // Check initial theme preference
-    const isDark = localStorage.getItem('theme') !== 'light';
+    const isDark = localStorage.getItem("theme") !== "light";
     setDarkMode(isDark);
     if (isDark) {
-      document.documentElement.classList.add('dark');
+      document.documentElement.classList.add("dark");
     } else {
-      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.remove("dark");
     }
   }, []);
 
@@ -36,18 +36,17 @@ export default function Navbar() {
     const nextDark = !darkMode;
     setDarkMode(nextDark);
     if (nextDark) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
     } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
     }
   };
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md transition-colors duration-200">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        
         {/* Brand Logo & Name */}
         <div className="flex items-center space-x-3">
           <Link href="/" className="flex items-center space-x-2.5 group">
@@ -56,19 +55,22 @@ export default function Navbar() {
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <span className="font-bold text-slate-900 dark:text-white tracking-tight text-lg">HR Contact Intelligence</span>
+                <span className="font-bold text-slate-900 dark:text-white tracking-tight text-lg">
+                  HR Contact Intelligence
+                </span>
                 <span className="inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-semibold text-blue-600 dark:text-blue-400 ring-1 ring-inset ring-blue-500/20">
                   v1.0
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">Public HR & Recruiter Discovery Platform</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">
+                Public HR & Recruiter Discovery Platform
+              </p>
             </div>
           </Link>
         </div>
 
         {/* Action Buttons & Theme Toggle */}
         <div className="flex items-center space-x-3">
-          
           {/* Quick Sample Template Dropdown / Download */}
           <a
             href={getSampleExcelUrl()}
@@ -87,10 +89,13 @@ export default function Navbar() {
             aria-label="Toggle theme"
             className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
           >
-            {darkMode ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-slate-600" />}
+            {darkMode ? (
+              <Sun className="h-4 w-4 text-amber-400" />
+            ) : (
+              <Moon className="h-4 w-4 text-slate-600" />
+            )}
           </button>
         </div>
-
       </div>
     </header>
   );

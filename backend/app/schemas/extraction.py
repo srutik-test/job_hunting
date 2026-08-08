@@ -1,6 +1,7 @@
 """
 Extraction request and event schemas.
 """
+
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 from app.schemas.company import CompanyBase

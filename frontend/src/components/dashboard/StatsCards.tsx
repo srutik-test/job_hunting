@@ -1,15 +1,15 @@
-'use client';
+"use client";
 
-import React from 'react';
-import { 
-  Building2, 
-  MailCheck, 
-  ShieldCheck, 
-  Activity, 
-  TrendingUp 
-} from 'lucide-react';
-import { LinkedInIcon } from '../ui/icons';
-import { GlobalStats } from '../../types';
+import React from "react";
+import {
+  Building2,
+  MailCheck,
+  ShieldCheck,
+  Activity,
+  TrendingUp,
+} from "lucide-react";
+import { LinkedInIcon } from "../ui/icons";
+import { GlobalStats } from "../../types";
 
 interface StatsCardsProps {
   stats: GlobalStats | null;
@@ -18,36 +18,36 @@ interface StatsCardsProps {
 export default function StatsCards({ stats }: StatsCardsProps) {
   const cards = [
     {
-      title: 'Total Companies Processed',
+      title: "Total Companies Processed",
       value: stats?.total_companies_processed ?? 0,
       icon: Building2,
-      color: 'from-blue-600 to-indigo-600',
-      badge: 'Aggregated',
+      color: "from-blue-600 to-indigo-600",
+      badge: "Aggregated",
       subtitle: `${stats?.total_jobs ?? 0} batches executed`,
     },
     {
-      title: 'Verified Public HR Emails',
+      title: "Verified Public HR Emails",
       value: stats?.total_verified_hr_emails ?? 0,
       icon: MailCheck,
-      color: 'from-emerald-600 to-teal-600',
+      color: "from-emerald-600 to-teal-600",
       badge: `${stats?.overall_hr_discovery_rate ?? 0}% Rate`,
-      subtitle: 'Official & MX verified',
+      subtitle: "Official & MX verified",
     },
     {
-      title: 'Public LinkedIn Profiles',
+      title: "Public LinkedIn Profiles",
       value: stats?.total_linkedin_profiles ?? 0,
       icon: LinkedInIcon,
-      color: 'from-indigo-600 to-violet-600',
-      badge: 'Public Roles',
-      subtitle: 'HR & Recruiters identified',
+      color: "from-indigo-600 to-violet-600",
+      badge: "Public Roles",
+      subtitle: "HR & Recruiters identified",
     },
     {
-      title: 'Average Confidence Rating',
+      title: "Average Confidence Rating",
       value: `${stats?.average_confidence_score ?? 0}%`,
       icon: ShieldCheck,
-      color: 'from-amber-500 to-orange-600',
-      badge: 'High Integrity',
-      subtitle: 'Zero fabricated emails',
+      color: "from-amber-500 to-orange-600",
+      badge: "High Integrity",
+      subtitle: "Zero fabricated emails",
     },
   ];
 
@@ -61,8 +61,12 @@ export default function StatsCards({ stats }: StatsCardsProps) {
             className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xs transition hover:shadow-md"
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{c.title}</span>
-              <div className={`flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-tr ${c.color} text-white shadow-xs`}>
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                {c.title}
+              </span>
+              <div
+                className={`flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-tr ${c.color} text-white shadow-xs`}
+              >
                 <Icon className="h-4 w-4" />
               </div>
             </div>

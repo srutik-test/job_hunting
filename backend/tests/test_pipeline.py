@@ -1,6 +1,7 @@
 """
 Unit tests for the ExtractionCoordinator pipeline.
 """
+
 import pytest
 from app.services.pipeline.coordinator import ExtractionCoordinator
 
@@ -8,17 +9,16 @@ from app.services.pipeline.coordinator import ExtractionCoordinator
 @pytest.mark.asyncio
 async def test_coordinator_execution_and_structure():
     coordinator = ExtractionCoordinator(
-        crawler_engine="auto",
-        enable_public_search=False
+        crawler_engine="auto", enable_public_search=False
     )
-    
+
     # Process a company with a controlled crawl
     result = await coordinator.process_company(
         company_name="Aspire Softserv",
         website="https://aspiresoftserv.com",
         location="Ahmedabad",
-        linkedin_url="https://linkedin.com/company/aspire-softserv",
-        max_pages=2
+        linkedin_url="https://linkedin.com/company/aspiresoftserv",
+        max_pages=2,
     )
 
     assert result is not None
