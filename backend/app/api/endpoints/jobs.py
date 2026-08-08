@@ -1,6 +1,7 @@
 """
 Job endpoints: Live progress, logs, cancellation, and metrics.
 """
+
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,9 +34,7 @@ async def get_job_progress(job_id: str, db: AsyncSession = Depends(get_db)):
 
 @router.get("/logs/{job_id}")
 async def get_job_log_stream(
-    job_id: str,
-    limit: int = Query(200, ge=1, le=1000),
-    since: Optional[str] = None
+    job_id: str, limit: int = Query(200, ge=1, le=1000), since: Optional[str] = None
 ):
     """
     Fetch structured live logs for a specific extraction job.
@@ -50,7 +49,11 @@ async def cancel_job(job_id: str):
     Cancel an ongoing extraction job.
     """
     success = await queue_manager.cancel_job(job_id)
-    return {"job_id": job_id, "cancelled": success, "message": "Job cancellation requested"}
+    return {
+        "job_id": job_id,
+        "cancelled": success,
+        "message": "Job cancellation requested",
+    }
 
 
 @router.get("/stats", response_model=JobStatsResponse)
@@ -68,25 +71,33 @@ async def get_global_extraction_stats(db: AsyncSession = Depends(get_db)):
 
     # Verified HR emails
     hr_count_res = await db.execute(
-        select(func.count(ExtractionResult.id)).where(ExtractionResult.hr_email != "Not Publicly Available")
+        select(func.count(ExtractionResult.id)).where(
+            ExtractionResult.hr_email != "Not Publicly Available"
+        )
     )
     total_hr_emails = hr_count_res.scalar() or 0
 
     # Recruitment emails
     recruit_count_res = await db.execute(
-        select(func.count(ExtractionResult.id)).where(ExtractionResult.recruitment_email != "Not Publicly Available")
+        select(func.count(ExtractionResult.id)).where(
+            ExtractionResult.recruitment_email != "Not Publicly Available"
+        )
     )
     total_recruit_emails = recruit_count_res.scalar() or 0
 
     # General emails
     general_count_res = await db.execute(
-        select(func.count(ExtractionResult.id)).where(ExtractionResult.general_email != "Not Publicly Available")
+        select(func.count(ExtractionResult.id)).where(
+            ExtractionResult.general_email != "Not Publicly Available"
+        )
     )
     total_general_emails = general_count_res.scalar() or 0
 
     # LinkedIn profiles
     li_count_res = await db.execute(
-        select(func.count(ExtractionResult.id)).where(ExtractionResult.linkedin_profile_url != "Not Publicly Available")
+        select(func.count(ExtractionResult.id)).where(
+            ExtractionResult.linkedin_profile_url != "Not Publicly Available"
+        )
     )
     total_li_profiles = li_count_res.scalar() or 0
 
@@ -96,11 +107,15 @@ async def get_global_extraction_stats(db: AsyncSession = Depends(get_db)):
 
     # Active job
     active_job_res = await db.execute(
-        select(ExtractionJob.id).where(ExtractionJob.status == "running").order_by(ExtractionJob.created_at.desc())
+        select(ExtractionJob.id)
+        .where(ExtractionJob.status == "running")
+        .order_by(ExtractionJob.created_at.desc())
     )
     active_job = active_job_res.scalars().first()
 
-    discovery_rate = round((total_hr_emails / total_results) * 100, 1) if total_results > 0 else 0.0
+    discovery_rate = (
+        round((total_hr_emails / total_results) * 100, 1) if total_results > 0 else 0.0
+    )
 
     return JobStatsResponse(
         total_jobs=total_jobs,
@@ -111,5 +126,5 @@ async def get_global_extraction_stats(db: AsyncSession = Depends(get_db)):
         total_linkedin_profiles=total_li_profiles,
         overall_hr_discovery_rate=discovery_rate,
         average_confidence_score=round(avg_conf, 1),
-        active_job_id=active_job
+        active_job_id=active_job,
     )

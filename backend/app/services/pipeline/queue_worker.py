@@ -3,6 +3,7 @@ Background Queue Worker.
 Manages asynchronous processing jobs, concurrency throttling,
 real-time status updates, and SSE/WebSocket event streaming.
 """
+
 import asyncio
 import time
 from typing import Dict, List, Any, Optional
@@ -21,7 +22,7 @@ from app.core.logging import add_job_log
 
 class JobQueueManager:
     """Singleton Job Queue Manager."""
-    
+
     _instance: Optional["JobQueueManager"] = None
     _active_tasks: Dict[str, asyncio.Task] = {}
     _paused_jobs: set[str] = set()
@@ -39,7 +40,7 @@ class JobQueueManager:
         crawler_engine: str = "auto",
         enable_public_search: bool = True,
         max_pages: int = 20,
-        concurrency: int = 3
+        concurrency: int = 3,
     ) -> str:
         """Spawn background async job processing."""
         task = asyncio.create_task(
@@ -49,7 +50,7 @@ class JobQueueManager:
                 crawler_engine=crawler_engine,
                 enable_public_search=enable_public_search,
                 max_pages=max_pages,
-                concurrency=concurrency
+                concurrency=concurrency,
             )
         )
         self._active_tasks[job_id] = task
@@ -78,19 +79,22 @@ class JobQueueManager:
         crawler_engine: str,
         enable_public_search: bool,
         max_pages: int,
-        concurrency: int
+        concurrency: int,
     ) -> None:
         """Background worker loop executing the batch extraction."""
         coordinator = ExtractionCoordinator(
-            crawler_engine=crawler_engine,
-            enable_public_search=enable_public_search
+            crawler_engine=crawler_engine, enable_public_search=enable_public_search
         )
         semaphore = asyncio.Semaphore(concurrency)
         total = len(companies)
         processed_count = 0
         start_ts = time.time()
 
-        add_job_log(job_id, "INFO", f"🚀 Starting extraction job for {total} companies (concurrency={concurrency})")
+        add_job_log(
+            job_id,
+            "INFO",
+            f"🚀 Starting extraction job for {total} companies (concurrency={concurrency})",
+        )
 
         # Update job to running in DB
         async with AsyncSessionLocal() as session:
@@ -128,7 +132,7 @@ class JobQueueManager:
                         linkedin_url=comp.linkedin_url or "",
                         max_pages=max_pages,
                         job_id=job_id,
-                        progress_callback=_page_progress_cb
+                        progress_callback=_page_progress_cb,
                     )
 
                     # Persist Result to DB
@@ -142,7 +146,7 @@ class JobQueueManager:
                                 name=comp.name,
                                 location=comp.location or "",
                                 website=comp.website,
-                                linkedin_url=comp.linkedin_url or ""
+                                linkedin_url=comp.linkedin_url or "",
                             )
                             session.add(db_comp)
                             await session.flush()
@@ -165,7 +169,7 @@ class JobQueueManager:
                             source=result_data["source"],
                             status=result_data["status"],
                             crawled_pages_count=result_data["crawled_pages_count"],
-                            raw_details_json=result_data["raw_details_json"]
+                            raw_details_json=result_data["raw_details_json"],
                         )
                         session.add(ext_result)
 
@@ -177,21 +181,32 @@ class JobQueueManager:
                         if j:
                             j.processed_companies = processed_count
                             j.pages_crawled_count += result_data["crawled_pages_count"]
-                            if result_data["hr_email"] != "Not Publicly Available" or result_data["recruitment_email"] != "Not Publicly Available":
+                            if (
+                                result_data["hr_email"] != "Not Publicly Available"
+                                or result_data["recruitment_email"]
+                                != "Not Publicly Available"
+                            ):
                                 j.emails_found_count += 1
-                            if result_data["linkedin_profile"] != "Not Publicly Available":
+                            if (
+                                result_data["linkedin_profile"]
+                                != "Not Publicly Available"
+                            ):
                                 j.profiles_found_count += 1
 
                             # Estimate remaining seconds
                             elapsed = time.time() - start_ts
-                            avg_time = elapsed / processed_count if processed_count > 0 else 0
+                            avg_time = (
+                                elapsed / processed_count if processed_count > 0 else 0
+                            )
                             remaining = max(0.0, avg_time * (total - processed_count))
                             j.estimated_remaining_seconds = round(remaining, 1)
 
                         await session.commit()
 
                 except Exception as e:
-                    add_job_log(job_id, "ERROR", f"Error processing '{comp.name}': {str(e)}")
+                    add_job_log(
+                        job_id, "ERROR", f"Error processing '{comp.name}': {str(e)}"
+                    )
                     processed_count += 1
 
         # Run tasks with concurrency
@@ -209,7 +224,11 @@ class JobQueueManager:
                 job.estimated_remaining_seconds = 0.0
                 await session.commit()
 
-        add_job_log(job_id, "INFO", f"🎉 Extraction job {job_id} successfully completed for all {total} companies!")
+        add_job_log(
+            job_id,
+            "INFO",
+            f"🎉 Extraction job {job_id} successfully completed for all {total} companies!",
+        )
         if job_id in self._active_tasks:
             del self._active_tasks[job_id]
 

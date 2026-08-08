@@ -1,14 +1,13 @@
-'use client';
+"use client";
 
-import React from 'react';
-import DataTable from '../../components/results/DataTable';
-import { Table2, ShieldCheck, Download, Sparkles } from 'lucide-react';
-import { getExcelExportUrl, getCsvExportUrl } from '../../lib/api';
+import React from "react";
+import DataTable from "../../components/results/DataTable";
+import { Table2, ShieldCheck, Download, Sparkles } from "lucide-react";
+import { getExcelExportUrl, getCsvExportUrl } from "../../lib/api";
 
 export default function ResultsPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
-      
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -17,7 +16,8 @@ export default function ResultsPage() {
             <span>Verified Public HR Contacts Intelligence</span>
           </h1>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Interactive multi-source intelligence table with confidence scoring, MX verification statuses, and instant exports.
+            Interactive multi-source intelligence table with confidence scoring,
+            MX verification statuses, and instant exports.
           </p>
         </div>
 
@@ -44,7 +44,6 @@ export default function ResultsPage() {
 
       {/* Main TanStack-style Results Table */}
       <DataTable />
-
     </div>
   );
 }

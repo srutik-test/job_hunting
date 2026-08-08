@@ -1,6 +1,7 @@
 """
 Base Crawler abstract interface.
 """
+
 from abc import ABC, abstractmethod
 from typing import Dict, List, Set, Any, Optional
 from pydantic import BaseModel
@@ -13,7 +14,9 @@ class CrawledPage(BaseModel):
     text_content: str = ""
     html_content: str = ""
     links: List[str] = []
-    page_type: str = "general"  # careers, contact, team, leadership, sitemap, privacy, general
+    page_type: str = (
+        "general"  # careers, contact, team, leadership, sitemap, privacy, general
+    )
     discovered_emails: List[str] = []
     discovered_linkedin_urls: List[str] = []
     meta_description: str = ""
@@ -42,7 +45,7 @@ class BaseCrawler(ABC):
         base_url: str,
         company_name: str,
         max_pages: int = 25,
-        progress_callback: Optional[Any] = None
+        progress_callback: Optional[Any] = None,
     ) -> CrawlResult:
         """Recursively crawl the target company website."""
         pass

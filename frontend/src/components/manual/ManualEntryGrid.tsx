@@ -1,66 +1,82 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Plus, Trash2, Play, Sparkles, AlertCircle, Building2, Globe, MapPin } from 'lucide-react';
-import { LinkedInIcon } from '../ui/icons';
-import { CompanyInput } from '../../types';
-import { startManualExtraction } from '../../lib/api';
+import React, { useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Plus,
+  Trash2,
+  Play,
+  Sparkles,
+  AlertCircle,
+  Building2,
+  Globe,
+  MapPin,
+} from "lucide-react";
+import { LinkedInIcon } from "../ui/icons";
+import { CompanyInput } from "../../types";
+import { startManualExtraction } from "../../lib/api";
 
 const DEFAULT_SAMPLE_COMPANIES: CompanyInput[] = [
   {
-    name: 'Aspire Softserv',
-    location: 'Ahmedabad',
-    website: 'https://aspiresoftserv.com',
-    linkedin_url: 'https://linkedin.com/company/aspire-softserv',
+    name: "Aspire Softserv",
+    location: "Ahmedabad",
+    website: "https://aspiresoftserv.com",
+    linkedin_url: "https://linkedin.com/company/aspiresoftserv",
   },
   {
-    name: 'Simform',
-    location: 'Ahmedabad',
-    website: 'https://simform.com',
-    linkedin_url: 'https://linkedin.com/company/simform',
+    name: "Simform",
+    location: "Ahmedabad",
+    website: "https://simform.com",
+    linkedin_url: "https://linkedin.com/company/simform",
   },
   {
-    name: 'Bacancy Technology',
-    location: 'Ahmedabad',
-    website: 'https://bacancytechnology.com',
-    linkedin_url: 'https://linkedin.com/company/bacancy-technology',
+    name: "Bacancy Technology",
+    location: "Ahmedabad",
+    website: "https://bacancytechnology.com",
+    linkedin_url: "https://linkedin.com/company/bacancy-technology",
   },
   {
-    name: 'Radixweb',
-    location: 'Ahmedabad',
-    website: 'https://radixweb.com',
-    linkedin_url: 'https://linkedin.com/company/radixweb',
+    name: "Radixweb",
+    location: "Ahmedabad",
+    website: "https://radixweb.com",
+    linkedin_url: "https://linkedin.com/company/radixweb",
   },
   {
-    name: 'TatvaSoft',
-    location: 'Ahmedabad',
-    website: 'https://tatvasoft.com',
-    linkedin_url: 'https://linkedin.com/company/tatvasoft',
+    name: "TatvaSoft",
+    location: "Ahmedabad",
+    website: "https://tatvasoft.com",
+    linkedin_url: "https://linkedin.com/company/tatvasoft",
   },
 ];
 
 export default function ManualEntryGrid() {
   const router = useRouter();
   const [companies, setCompanies] = useState<CompanyInput[]>([
-    { name: '', location: '', website: '', linkedin_url: '' },
+    { name: "", location: "", website: "", linkedin_url: "" },
   ]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   const addRow = () => {
-    setCompanies([...companies, { name: '', location: '', website: '', linkedin_url: '' }]);
+    setCompanies([
+      ...companies,
+      { name: "", location: "", website: "", linkedin_url: "" },
+    ]);
   };
 
   const removeRow = (index: number) => {
     if (companies.length <= 1) {
-      setCompanies([{ name: '', location: '', website: '', linkedin_url: '' }]);
+      setCompanies([{ name: "", location: "", website: "", linkedin_url: "" }]);
       return;
     }
     setCompanies(companies.filter((_, i) => i !== index));
   };
 
-  const updateCell = (index: number, field: keyof CompanyInput, value: string) => {
+  const updateCell = (
+    index: number,
+    field: keyof CompanyInput,
+    value: string,
+  ) => {
     const next = [...companies];
     next[index][field] = value;
     setCompanies(next);
@@ -74,33 +90,35 @@ export default function ManualEntryGrid() {
     setError(null);
     const valid = companies.filter((c) => c.name.trim() && c.website.trim());
     if (valid.length === 0) {
-      setError('Please enter at least one company with a Name and Website.');
+      setError("Please enter at least one company with a Name and Website.");
       return;
     }
 
     setLoading(true);
     try {
       const res = await startManualExtraction(valid, {
-        crawler_engine: 'auto',
+        crawler_engine: "auto",
         enable_public_search: true,
         max_pages_per_company: 20,
       });
       router.push(`/processing?job_id=${res.job_id}`);
     } catch (err: any) {
-      setError(err.message || 'Failed to start extraction.');
+      setError(err.message || "Failed to start extraction.");
       setLoading(false);
     }
   };
 
   return (
     <div className="space-y-6">
-      
       {/* Top Header Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Manual Company Entry</h2>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+            Manual Company Entry
+          </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Enter one or more target companies directly into the data entry grid.
+            Enter one or more target companies directly into the data entry
+            grid.
           </p>
         </div>
 
@@ -133,7 +151,6 @@ export default function ManualEntryGrid() {
       {/* Spreadsheet Input Grid */}
       <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
         <table className="w-full text-left text-xs border-collapse">
-          
           <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 text-[11px] font-semibold text-slate-700 dark:text-slate-300 uppercase">
             <tr>
               <th className="px-4 py-3.5 w-12 text-center">#</th>
@@ -167,18 +184,21 @@ export default function ManualEntryGrid() {
 
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {companies.map((row, idx) => (
-              <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+              <tr
+                key={idx}
+                className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40"
+              >
                 <td className="px-4 py-2.5 text-center font-mono text-slate-400">
                   {idx + 1}
                 </td>
-                
+
                 {/* Company Name */}
                 <td className="px-4 py-2.5">
                   <input
                     type="text"
                     placeholder="e.g. Aspire Softserv"
                     value={row.name}
-                    onChange={(e) => updateCell(idx, 'name', e.target.value)}
+                    onChange={(e) => updateCell(idx, "name", e.target.value)}
                     className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </td>
@@ -188,8 +208,10 @@ export default function ManualEntryGrid() {
                   <input
                     type="text"
                     placeholder="e.g. Ahmedabad"
-                    value={row.location || ''}
-                    onChange={(e) => updateCell(idx, 'location', e.target.value)}
+                    value={row.location || ""}
+                    onChange={(e) =>
+                      updateCell(idx, "location", e.target.value)
+                    }
                     className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </td>
@@ -200,7 +222,7 @@ export default function ManualEntryGrid() {
                     type="text"
                     placeholder="https://aspiresoftserv.com"
                     value={row.website}
-                    onChange={(e) => updateCell(idx, 'website', e.target.value)}
+                    onChange={(e) => updateCell(idx, "website", e.target.value)}
                     className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 px-3 py-1.5 text-xs font-mono text-blue-600 dark:text-blue-400 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </td>
@@ -209,9 +231,11 @@ export default function ManualEntryGrid() {
                 <td className="px-4 py-2.5">
                   <input
                     type="text"
-                    placeholder="https://linkedin.com/company/aspire-softserv"
-                    value={row.linkedin_url || ''}
-                    onChange={(e) => updateCell(idx, 'linkedin_url', e.target.value)}
+                    placeholder="https://linkedin.com/company/aspiresoftserv"
+                    value={row.linkedin_url || ""}
+                    onChange={(e) =>
+                      updateCell(idx, "linkedin_url", e.target.value)
+                    }
                     className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </td>
@@ -225,30 +249,32 @@ export default function ManualEntryGrid() {
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </td>
-
               </tr>
             ))}
           </tbody>
-
         </table>
       </div>
 
       {/* Bottom Launch Button */}
       <div className="flex items-center justify-between">
         <span className="text-xs text-slate-500">
-          {companies.filter((c) => c.name.trim() && c.website.trim()).length} of {companies.length} rows ready
+          {companies.filter((c) => c.name.trim() && c.website.trim()).length} of{" "}
+          {companies.length} rows ready
         </span>
 
         <button
           onClick={handleStart}
-          disabled={loading || companies.filter((c) => c.name.trim() && c.website.trim()).length === 0}
+          disabled={
+            loading ||
+            companies.filter((c) => c.name.trim() && c.website.trim())
+              .length === 0
+          }
           className="inline-flex items-center space-x-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 transition"
         >
           <Play className="h-4 w-4 fill-white" />
           <span>Launch HR Extraction</span>
         </button>
       </div>
-
     </div>
   );
 }

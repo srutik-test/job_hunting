@@ -1,6 +1,7 @@
 """
 Unit tests for Email Classification and Verification logic.
 """
+
 import pytest
 from app.services.extractor.email_classifier import classify_email, select_best_contacts
 from app.services.extractor.verifier import ContactVerifier
@@ -37,7 +38,7 @@ def test_select_best_contacts_priority():
         classify_email("careers@aspiresoftserv.com", page_type="careers"),
         classify_email("hr@aspiresoftserv.com", page_type="careers"),
     ]
-    (hr, recruit, careers, general, source, score) = select_best_contacts(emails)
+    hr, recruit, careers, general, source, score = select_best_contacts(emails)
     assert hr == "hr@aspiresoftserv.com"
     assert careers == "careers@aspiresoftserv.com"
     assert score >= 90
@@ -50,7 +51,7 @@ def test_status_and_confidence_evaluation():
         careers_email="careers@aspiresoftserv.com",
         general_email="info@aspiresoftserv.com",
         hr_profile_url="https://linkedin.com/in/hr-manager",
-        source="Official Careers Page"
+        source="Official Careers Page",
     )
     assert status == "Verified Public HR Email"
     assert score >= 90
@@ -62,7 +63,7 @@ def test_status_and_confidence_evaluation():
         careers_email="Not Publicly Available",
         general_email="info@company.com",
         hr_profile_url="Not Publicly Available",
-        source="Contact Page"
+        source="Contact Page",
     )
     assert status_gen == "General Contact Email"
     assert score_gen == 70
@@ -74,10 +75,7 @@ def test_linkedin_search_snippet_parser():
     url = "https://www.linkedin.com/in/janedoe-recruiter-12345"
 
     profile = LinkedInFinder.parse_public_search_snippet(
-        title=title,
-        snippet=snippet,
-        profile_url=url,
-        company_name="Aspire Softserv"
+        title=title, snippet=snippet, profile_url=url, company_name="Aspire Softserv"
     )
     assert profile is not None
     assert profile.name == "Jane Doe"

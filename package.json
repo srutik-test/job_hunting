@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "format:frontend": "npm --prefix frontend run format",
+    "format:backend": "python -m black backend"
   },
   "repository": {
     "type": "git",
@@ -16,5 +18,8 @@
   "bugs": {
     "url": "https://github.com/srutik-test/job_hunting/issues"
   },
-  "homepage": "https://github.com/srutik-test/job_hunting#readme"
+  "homepage": "https://github.com/srutik-test/job_hunting#readme",
+  "devDependencies": {
+    "prettier": "^3.9.6"
+  }
 }

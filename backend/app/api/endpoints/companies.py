@@ -1,6 +1,7 @@
 """
 Company endpoints: CSV/Excel uploads, column validation, and manual entry.
 """
+
 from typing import List, Optional
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,7 +28,7 @@ async def preview_company_upload(file: UploadFile = File(...)):
     if not file.filename.endswith((".xlsx", ".xls", ".csv")):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid file format. Please upload an Excel (.xlsx, .xls) or CSV (.csv) file."
+            detail="Invalid file format. Please upload an Excel (.xlsx, .xls) or CSV (.csv) file.",
         )
 
     content = await file.read()
@@ -36,8 +37,7 @@ async def preview_company_upload(file: UploadFile = File(...)):
         return preview
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(e)
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)
         )
 
 
@@ -48,7 +48,7 @@ async def upload_and_start_extraction(
     enable_public_search: bool = Form(True),
     max_pages_per_company: int = Form(20),
     concurrency: int = Form(3),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Upload Excel/CSV file and immediately launch asynchronous extraction job.
@@ -60,7 +60,9 @@ async def upload_and_start_extraction(
         raise HTTPException(status_code=400, detail=str(e))
 
     if not companies:
-        raise HTTPException(status_code=400, detail="No valid companies found in uploaded file.")
+        raise HTTPException(
+            status_code=400, detail="No valid companies found in uploaded file."
+        )
 
     # Create job in database
     job_id = str(uuid.uuid4())
@@ -68,7 +70,7 @@ async def upload_and_start_extraction(
         id=job_id,
         status="pending",
         total_companies=len(companies),
-        processed_companies=0
+        processed_companies=0,
     )
     db.add(new_job)
     await db.commit()
@@ -80,34 +82,35 @@ async def upload_and_start_extraction(
         crawler_engine=crawler_engine,
         enable_public_search=enable_public_search,
         max_pages=max_pages_per_company,
-        concurrency=concurrency
+        concurrency=concurrency,
     )
 
     return {
         "job_id": job_id,
         "status": "pending",
         "total_companies": len(companies),
-        "message": f"Successfully queued extraction for {len(companies)} companies."
+        "message": f"Successfully queued extraction for {len(companies)} companies.",
     }
 
 
 @router.post("/manual-start")
 async def manual_entry_start_extraction(
-    request: ManualExtractionRequest,
-    db: AsyncSession = Depends(get_db)
+    request: ManualExtractionRequest, db: AsyncSession = Depends(get_db)
 ):
     """
     Start extraction for manually entered company records.
     """
     if not request.companies:
-        raise HTTPException(status_code=400, detail="At least one company must be provided.")
+        raise HTTPException(
+            status_code=400, detail="At least one company must be provided."
+        )
 
     job_id = str(uuid.uuid4())
     new_job = ExtractionJob(
         id=job_id,
         status="pending",
         total_companies=len(request.companies),
-        processed_companies=0
+        processed_companies=0,
     )
     db.add(new_job)
     await db.commit()
@@ -118,12 +121,12 @@ async def manual_entry_start_extraction(
         crawler_engine=request.crawler_engine,
         enable_public_search=request.enable_public_search,
         max_pages=request.max_pages_per_company,
-        concurrency=3
+        concurrency=3,
     )
 
     return {
         "job_id": job_id,
         "status": "pending",
         "total_companies": len(request.companies),
-        "message": f"Extraction job created for {len(request.companies)} companies."
+        "message": f"Extraction job created for {len(request.companies)} companies.",
     }

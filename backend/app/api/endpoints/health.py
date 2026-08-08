@@ -1,6 +1,7 @@
 """
 Health check and system diagnostics endpoint.
 """
+
 from fastapi import APIRouter
 from app.core.config import settings
 
@@ -25,5 +26,5 @@ async def health_check():
             "excel_xlsx_import_export": True,
             "csv_import_export": True,
             "structured_live_logging": True,
-        }
+        },
     }

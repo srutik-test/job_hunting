@@ -1,26 +1,26 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { 
-  UploadCloud, 
-  PenTool, 
-  Table2, 
-  Activity, 
-  ArrowRight, 
-  Building2, 
-  Mail, 
-  ShieldCheck, 
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import {
+  UploadCloud,
+  PenTool,
+  Table2,
+  Activity,
+  ArrowRight,
+  Building2,
+  Mail,
+  ShieldCheck,
   FileSpreadsheet,
   Download,
-  Sparkles
-} from 'lucide-react';
-import StatsCards from '../components/dashboard/StatsCards';
-import PipelineDiagram from '../components/dashboard/PipelineDiagram';
-import { fetchStats, fetchResults, getSampleExcelUrl } from '../lib/api';
-import { GlobalStats, ExtractionResult } from '../types';
-import ConfidenceBadge from '../components/results/ConfidenceBadge';
-import StatusBadge from '../components/results/StatusBadge';
+  Sparkles,
+} from "lucide-react";
+import StatsCards from "../components/dashboard/StatsCards";
+import PipelineDiagram from "../components/dashboard/PipelineDiagram";
+import { fetchStats, fetchResults, getSampleExcelUrl } from "../lib/api";
+import { GlobalStats, ExtractionResult } from "../types";
+import ConfidenceBadge from "../components/results/ConfidenceBadge";
+import StatusBadge from "../components/results/StatusBadge";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<GlobalStats | null>(null);
@@ -47,7 +47,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
-      
       {/* Top Banner / Welcome */}
       <div className="rounded-3xl bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-900 p-8 text-white shadow-xl relative overflow-hidden">
         <div className="relative z-10 max-w-2xl space-y-3">
@@ -55,13 +54,15 @@ export default function DashboardPage() {
             <Sparkles className="h-3.5 w-3.5 text-blue-300" />
             <span>Public HR & Talent Acquisition Discovery Platform</span>
           </div>
-          
+
           <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl text-white">
             Discover Verified Public HR & Recruitment Contacts
           </h1>
-          
+
           <p className="text-sm text-blue-100 leading-relaxed">
-            Recursively crawls target company websites, extracts public career/recruitment mailboxes, locates publicly indexed HR LinkedIn profiles, and verifies every result with DNS MX records.
+            Recursively crawls target company websites, extracts public
+            career/recruitment mailboxes, locates publicly indexed HR LinkedIn
+            profiles, and verifies every result with DNS MX records.
           </p>
 
           <div className="pt-2 flex flex-wrap items-center gap-3">
@@ -97,7 +98,6 @@ export default function DashboardPage() {
 
       {/* Quick Launch Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        
         <Link
           href="/upload"
           className="group rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xs hover:border-blue-500 hover:shadow-lg transition duration-150"
@@ -109,7 +109,8 @@ export default function DashboardPage() {
             Batch Excel & CSV Upload
           </h3>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Upload custom company files with automatic column detection and interactive preview.
+            Upload custom company files with automatic column detection and
+            interactive preview.
           </p>
         </Link>
 
@@ -124,7 +125,8 @@ export default function DashboardPage() {
             Manual Single & Bulk Entry
           </h3>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Directly input company names, headquarters, and websites using the live spreadsheet editor.
+            Directly input company names, headquarters, and websites using the
+            live spreadsheet editor.
           </p>
         </Link>
 
@@ -139,10 +141,10 @@ export default function DashboardPage() {
             Verified Results Intelligence
           </h3>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            View, sort, filter, and export verified HR emails and LinkedIn profiles to Excel and CSV.
+            View, sort, filter, and export verified HR emails and LinkedIn
+            profiles to Excel and CSV.
           </p>
         </Link>
-
       </div>
 
       {/* Recent Extraction Discoveries Table */}
@@ -180,27 +182,42 @@ export default function DashboardPage() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {recentResults.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
-                    No extractions run yet. Start by uploading an Excel/CSV file or manually entering a company.
+                  <td
+                    colSpan={5}
+                    className="px-6 py-8 text-center text-slate-400"
+                  >
+                    No extractions run yet. Start by uploading an Excel/CSV file
+                    or manually entering a company.
                   </td>
                 </tr>
               ) : (
                 recentResults.map((r) => (
-                  <tr key={r.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                  <tr
+                    key={r.id}
+                    className="hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                  >
                     <td className="px-6 py-3 font-semibold text-slate-900 dark:text-white">
                       {r.company_name}
                     </td>
                     <td className="px-6 py-3 font-mono font-medium text-emerald-700 dark:text-emerald-400">
-                      {r.hr_email !== 'Not Publicly Available' ? r.hr_email : r.recruitment_email}
+                      {r.hr_email !== "Not Publicly Available"
+                        ? r.hr_email
+                        : r.recruitment_email}
                     </td>
                     <td className="px-6 py-3">
-                      {r.hr_name !== 'Not Publicly Available' ? (
+                      {r.hr_name !== "Not Publicly Available" ? (
                         <div>
-                          <span className="font-medium text-slate-800 dark:text-slate-200">{r.hr_name}</span>
-                          <span className="text-[10px] text-slate-400 block">{r.hr_position}</span>
+                          <span className="font-medium text-slate-800 dark:text-slate-200">
+                            {r.hr_name}
+                          </span>
+                          <span className="text-[10px] text-slate-400 block">
+                            {r.hr_position}
+                          </span>
                         </div>
                       ) : (
-                        <span className="text-slate-400">Not Publicly Available</span>
+                        <span className="text-slate-400">
+                          Not Publicly Available
+                        </span>
                       )}
                     </td>
                     <td className="px-6 py-3">
@@ -216,7 +233,6 @@ export default function DashboardPage() {
           </table>
         </div>
       </div>
-
     </div>
   );
 }

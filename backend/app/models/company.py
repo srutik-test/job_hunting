@@ -1,6 +1,7 @@
 """
 Company database model.
 """
+
 from datetime import datetime, timezone
 import uuid
 from sqlalchemy import Column, String, DateTime, Text
@@ -16,7 +17,11 @@ class Company(Base):
     website = Column(String(1024), nullable=False)
     linkedin_url = Column(String(1024), nullable=True, default="")
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
     def to_dict(self):
         return {

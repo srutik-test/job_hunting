@@ -2,6 +2,7 @@
 Sitemap and Robots.txt parser.
 Extracts direct public URLs for careers, jobs, and contact pages from XML sitemaps.
 """
+
 import re
 import xml.etree.ElementTree as ET
 from typing import List, Set
@@ -15,9 +16,14 @@ class SitemapParser:
 
     def __init__(self, timeout: float = 10.0, user_agent: str = ""):
         self.timeout = timeout
-        self.headers = {"User-Agent": user_agent or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        self.headers = {
+            "User-Agent": user_agent
+            or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        }
 
-    async def discover_sitemap_urls(self, base_url: str, client: httpx.AsyncClient) -> List[str]:
+    async def discover_sitemap_urls(
+        self, base_url: str, client: httpx.AsyncClient
+    ) -> List[str]:
         """Discover candidate high-priority URLs from sitemap.xml and robots.txt."""
         discovered_urls: Set[str] = set()
         sitemap_locations = [
@@ -30,7 +36,12 @@ class SitemapParser:
 
         for sitemap_url in sitemap_locations:
             try:
-                resp = await client.get(sitemap_url, headers=self.headers, timeout=self.timeout, follow_redirects=True)
+                resp = await client.get(
+                    sitemap_url,
+                    headers=self.headers,
+                    timeout=self.timeout,
+                    follow_redirects=True,
+                )
                 if resp.status_code != 200:
                     continue
 
@@ -67,10 +78,17 @@ class SitemapParser:
         prioritized.sort(key=lambda x: x[0], reverse=True)
         return [url for _, url in prioritized[:30]]
 
-    async def _parse_xml_sitemap(self, sitemap_url: str, client: httpx.AsyncClient) -> Set[str]:
+    async def _parse_xml_sitemap(
+        self, sitemap_url: str, client: httpx.AsyncClient
+    ) -> Set[str]:
         """Fetch and parse sub-sitemap."""
         try:
-            resp = await client.get(sitemap_url, headers=self.headers, timeout=self.timeout, follow_redirects=True)
+            resp = await client.get(
+                sitemap_url,
+                headers=self.headers,
+                timeout=self.timeout,
+                follow_redirects=True,
+            )
             if resp.status_code == 200:
                 return self._extract_urls_from_xml(resp.text, sitemap_url)
         except Exception:
@@ -82,7 +100,7 @@ class SitemapParser:
         urls: Set[str] = set()
         try:
             # Strip namespaces for easier XPath
-            cleaned_xml = re.sub(r'xmlns="[^"]+"', '', xml_content, count=1)
+            cleaned_xml = re.sub(r'xmlns="[^"]+"', "", xml_content, count=1)
             root = ET.fromstring(cleaned_xml)
 
             # Check for <url><loc>
@@ -97,7 +115,9 @@ class SitemapParser:
                     urls.add(loc.text.strip())
         except Exception:
             # Fallback regex
-            loc_matches = re.findall(r'<loc>(https?://[^<]+)</loc>', xml_content, re.IGNORECASE)
+            loc_matches = re.findall(
+                r"<loc>(https?://[^<]+)</loc>", xml_content, re.IGNORECASE
+            )
             for m in loc_matches:
                 urls.add(m.strip())
 

@@ -1,15 +1,24 @@
 """
 Company Pydantic schemas.
 """
+
 from typing import Optional, List
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 
 class CompanyBase(BaseModel):
-    name: str = Field(..., min_length=1, max_length=255, description="Official company name")
-    location: Optional[str] = Field(default="", max_length=255, description="Headquarters or branch location")
-    website: str = Field(..., min_length=3, max_length=1024, description="Official company website URL")
-    linkedin_url: Optional[str] = Field(default="", max_length=1024, description="Public LinkedIn company URL")
+    name: str = Field(
+        ..., min_length=1, max_length=255, description="Official company name"
+    )
+    location: Optional[str] = Field(
+        default="", max_length=255, description="Headquarters or branch location"
+    )
+    website: str = Field(
+        ..., min_length=3, max_length=1024, description="Official company website URL"
+    )
+    linkedin_url: Optional[str] = Field(
+        default="", max_length=1024, description="Public LinkedIn company URL"
+    )
 
     @field_validator("website")
     @classmethod

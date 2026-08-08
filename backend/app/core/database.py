@@ -2,6 +2,7 @@
 Database session and base models setup.
 Supports Async SQLAlchemy engine with SQLite/PostgreSQL.
 """
+
 import os
 from pathlib import Path
 from typing import AsyncGenerator
@@ -19,7 +20,9 @@ engine = create_async_engine(
     settings.DATABASE_URL,
     echo=False,
     future=True,
-    connect_args={"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {}
+    connect_args=(
+        {"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {}
+    ),
 )
 
 # Async session factory
@@ -28,7 +31,7 @@ AsyncSessionLocal = async_sessionmaker(
     class_=AsyncSession,
     expire_on_commit=False,
     autocommit=False,
-    autoflush=False
+    autoflush=False,
 )
 
 Base = declarative_base()

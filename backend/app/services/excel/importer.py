@@ -2,6 +2,7 @@
 Excel and CSV Importer module.
 Supports robust parsing, fuzzy column mapping, validation, and sample template generation.
 """
+
 import io
 import re
 from typing import List, Dict, Any, Tuple, Optional
@@ -16,21 +17,55 @@ class ExcelImporter:
 
     # Fuzzy column aliases
     COLUMN_ALIASES = {
-        "name": ["company name", "company", "company_name", "organization", "business name", "firm"],
-        "location": ["location", "city", "headquarters", "hq", "company location", "country", "address"],
-        "website": ["website", "company website", "url", "web", "domain", "site", "homepage"],
-        "linkedin_url": ["linkedin", "linkedin url", "company linkedin", "linkedin_url", "linkedin link", "company linkedin url"]
+        "name": [
+            "company name",
+            "company",
+            "company_name",
+            "organization",
+            "business name",
+            "firm",
+        ],
+        "location": [
+            "location",
+            "city",
+            "headquarters",
+            "hq",
+            "company location",
+            "country",
+            "address",
+        ],
+        "website": [
+            "website",
+            "company website",
+            "url",
+            "web",
+            "domain",
+            "site",
+            "homepage",
+        ],
+        "linkedin_url": [
+            "linkedin",
+            "linkedin url",
+            "company linkedin",
+            "linkedin_url",
+            "linkedin link",
+            "company linkedin url",
+        ],
     }
 
     @classmethod
-    def parse_file(cls, file_content: bytes, filename: str) -> Tuple[List[CompanyBase], CompanyBatchUploadPreview]:
+    def parse_file(
+        cls, file_content: bytes, filename: str
+    ) -> Tuple[List[CompanyBase], CompanyBatchUploadPreview]:
         """Parse Excel or CSV bytes into validated Company records and preview metadata."""
         if filename.endswith(".csv"):
             df = pd.read_csv(io.BytesIO(file_content))
         elif filename.endswith((".xlsx", ".xls")):
             df = pd.read_excel(io.BytesIO(file_content))
         else:
-            raise ValueError("Unsupported file format. Please upload .xlsx, .xls, or .csv")
+            raise ValueError(
+                "Unsupported file format. Please upload .xlsx, .xls, or .csv"
+            )
 
         # Normalize column headers
         raw_columns = [str(c).strip() for c in df.columns]
@@ -39,7 +74,9 @@ class ExcelImporter:
         for raw_col in raw_columns:
             cleaned_col = raw_col.lower().replace("_", " ").replace("-", " ")
             for target_field, aliases in cls.COLUMN_ALIASES.items():
-                if cleaned_col in aliases or any(alias in cleaned_col for alias in aliases):
+                if cleaned_col in aliases or any(
+                    alias in cleaned_col for alias in aliases
+                ):
                     if target_field not in mapped_columns:
                         mapped_columns[target_field] = raw_col
 
@@ -52,25 +89,44 @@ class ExcelImporter:
             missing_columns.append("Website")
 
         if missing_columns:
-            raise ValueError(f"Missing required columns in file: {', '.join(missing_columns)}. Found columns: {', '.join(raw_columns)}")
+            raise ValueError(
+                f"Missing required columns in file: {', '.join(missing_columns)}. Found columns: {', '.join(raw_columns)}"
+            )
 
         valid_companies: List[CompanyBase] = []
         invalid_count = 0
 
         for idx, row in df.iterrows():
             try:
-                name_val = str(row[mapped_columns["name"]]).strip() if pd.notna(row[mapped_columns["name"]]) else ""
-                website_val = str(row[mapped_columns["website"]]).strip() if pd.notna(row[mapped_columns["website"]]) else ""
-                
+                name_val = (
+                    str(row[mapped_columns["name"]]).strip()
+                    if pd.notna(row[mapped_columns["name"]])
+                    else ""
+                )
+                website_val = (
+                    str(row[mapped_columns["website"]]).strip()
+                    if pd.notna(row[mapped_columns["website"]])
+                    else ""
+                )
+
                 location_val = ""
-                if "location" in mapped_columns and pd.notna(row[mapped_columns["location"]]):
+                if "location" in mapped_columns and pd.notna(
+                    row[mapped_columns["location"]]
+                ):
                     location_val = str(row[mapped_columns["location"]]).strip()
 
                 linkedin_val = ""
-                if "linkedin_url" in mapped_columns and pd.notna(row[mapped_columns["linkedin_url"]]):
+                if "linkedin_url" in mapped_columns and pd.notna(
+                    row[mapped_columns["linkedin_url"]]
+                ):
                     linkedin_val = str(row[mapped_columns["linkedin_url"]]).strip()
 
-                if not name_val or name_val.lower() == "nan" or not website_val or website_val.lower() == "nan":
+                if (
+                    not name_val
+                    or name_val.lower() == "nan"
+                    or not website_val
+                    or website_val.lower() == "nan"
+                ):
                     invalid_count += 1
                     continue
 
@@ -78,7 +134,7 @@ class ExcelImporter:
                     name=name_val,
                     location=location_val if location_val.lower() != "nan" else "",
                     website=website_val,
-                    linkedin_url=linkedin_val if linkedin_val.lower() != "nan" else ""
+                    linkedin_url=linkedin_val if linkedin_val.lower() != "nan" else "",
                 )
                 valid_companies.append(company)
             except Exception as e:
@@ -92,7 +148,7 @@ class ExcelImporter:
             preview_items=valid_companies[:10],
             detected_columns=raw_columns,
             missing_columns=missing_columns,
-            warnings=warnings[:10]
+            warnings=warnings[:10],
         )
 
         return valid_companies, preview
@@ -108,20 +164,47 @@ class ExcelImporter:
         ws.append(headers)
 
         sample_rows = [
-            ["Aspire Softserv", "Ahmedabad", "https://aspiresoftserv.com", "https://linkedin.com/company/aspire-softserv"],
-            ["Simform", "Ahmedabad", "https://simform.com", "https://linkedin.com/company/simform"],
-            ["Bacancy Technology", "Ahmedabad", "https://bacancytechnology.com", "https://linkedin.com/company/bacancy-technology"],
-            ["Radixweb", "Ahmedabad", "https://radixweb.com", "https://linkedin.com/company/radixweb"],
-            ["TatvaSoft", "Ahmedabad", "https://tatvasoft.com", "https://linkedin.com/company/tatvasoft"],
+            [
+                "Aspire Softserv",
+                "Ahmedabad",
+                "https://aspiresoftserv.com",
+                "https://linkedin.com/company/aspiresoftserv",
+            ],
+            [
+                "Simform",
+                "Ahmedabad",
+                "https://simform.com",
+                "https://linkedin.com/company/simform",
+            ],
+            [
+                "Bacancy Technology",
+                "Ahmedabad",
+                "https://bacancytechnology.com",
+                "https://linkedin.com/company/bacancy-technology",
+            ],
+            [
+                "Radixweb",
+                "Ahmedabad",
+                "https://radixweb.com",
+                "https://linkedin.com/company/radixweb",
+            ],
+            [
+                "TatvaSoft",
+                "Ahmedabad",
+                "https://tatvasoft.com",
+                "https://linkedin.com/company/tatvasoft",
+            ],
         ]
 
         for r in sample_rows:
             ws.append(r)
 
         # Style header
-        header_fill = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid")
+        header_fill = PatternFill(
+            start_color="1E293B", end_color="1E293B", fill_type="solid"
+        )
         header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
-        
+
         for col_num, _ in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col_num)
             cell.fill = header_fill
@@ -144,7 +227,7 @@ class ExcelImporter:
         """Generate sample CSV template string."""
         return (
             "Company Name,Location,Website,LinkedIn URL\n"
-            "Aspire Softserv,Ahmedabad,https://aspiresoftserv.com,https://linkedin.com/company/aspire-softserv\n"
+            "Aspire Softserv,Ahmedabad,https://aspiresoftserv.com,https://linkedin.com/company/aspiresoftserv\n"
             "Simform,Ahmedabad,https://simform.com,https://linkedin.com/company/simform\n"
             "Bacancy Technology,Ahmedabad,https://bacancytechnology.com,https://linkedin.com/company/bacancy-technology\n"
             "Radixweb,Ahmedabad,https://radixweb.com,https://linkedin.com/company/radixweb\n"

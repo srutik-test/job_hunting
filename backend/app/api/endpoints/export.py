@@ -1,6 +1,7 @@
 """
 Export endpoints: Excel (.xlsx) and CSV downloads, sample import template generation.
 """
+
 from typing import Optional
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,7 +21,7 @@ async def export_results_excel(
     status: Optional[str] = None,
     min_confidence: Optional[int] = None,
     search: Optional[str] = None,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Download verified results as a professionally formatted Excel (.xlsx) workbook.
@@ -35,8 +36,8 @@ async def export_results_excel(
     if search:
         term = f"%{search.strip()}%"
         stmt = stmt.where(
-            (ExtractionResult.company_name.ilike(term)) |
-            (ExtractionResult.website.ilike(term))
+            (ExtractionResult.company_name.ilike(term))
+            | (ExtractionResult.website.ilike(term))
         )
 
     res = await db.execute(stmt)
@@ -48,7 +49,7 @@ async def export_results_excel(
     return Response(
         content=excel_bytes,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -56,7 +57,7 @@ async def export_results_excel(
 async def export_results_csv(
     job_id: Optional[str] = None,
     status: Optional[str] = None,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Download verified results as a CSV file.
@@ -76,7 +77,7 @@ async def export_results_csv(
     return Response(
         content=csv_str,
         media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -89,7 +90,9 @@ async def download_sample_excel_template():
     return Response(
         content=excel_bytes,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": 'attachment; filename="sample_companies_template.xlsx"'}
+        headers={
+            "Content-Disposition": 'attachment; filename="sample_companies_template.xlsx"'
+        },
     )
 
 
@@ -102,5 +105,7 @@ async def download_sample_csv_template():
     return Response(
         content=csv_str,
         media_type="text/csv",
-        headers={"Content-Disposition": 'attachment; filename="sample_companies_template.csv"'}
+        headers={
+            "Content-Disposition": 'attachment; filename="sample_companies_template.csv"'
+        },
     )
