@@ -1,176 +1,276 @@
-# HR & Recruitment Contact Intelligence Platform
+# HR & Recruitment Contact Intelligence Platform (v2)
 
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat&logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Next.js](https://img.shields.io/badge/Next.js-16.3-black?style=flat&logo=next.js&logoColor=white)](https://nextjs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?style=flat&logo=typescript&logoColor=white)](https://typescriptlang.org)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.3-38B2AC?style=flat&logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+A full-stack, production-grade platform that discovers **real, verified HR and
+recruitment contacts** — and *never* generates, guesses, or fabricates email
+addresses.
 
-A **production-ready, full-stack web application** that discovers, extracts, and verifies **publicly available HR and recruitment contact information** (official HR email addresses, recruitment mailboxes, and recruiter/HR LinkedIn profiles) from target company websites and public indices.
-
-Built with **clean architecture, modular services, async concurrency, and an excellent UI/UX with dark mode support**.
+> **Core principle:** `Evidence → Extraction → Context → Verification → Result`
+>
+> If no reliable HR email exists for a company, the platform honestly reports
+> **"No verified HR email found."** instead of returning a made-up address.
 
 ---
 
-## 🌟 Key Features
+## What this platform does
 
-- **Batch Upload (Excel & CSV)**: Drag & drop upload with fuzzy column mapping (auto-detects `Company Name`, `Location`, `Website`, `LinkedIn URL`) and interactive pre-extraction preview.
-- **Manual Entry Grid**: Single and multi-company spreadsheet input with one-click sample loader.
-- **Intelligent 5-Step Pipeline**:
-  1. *Recursive Website Crawling*: Automatic discovery of `/careers`, `/jobs`, `/team`, `/about-us`, `/leadership`, `/contact`, and `sitemap.xml`.
-  2. *Email Extraction & Categorization*: Classifies into `HR`, `Recruitment`, `Careers`, `Talent Acquisition`, and filters generic `info@`, `support@`, `sales@` emails unless used as a fallback.
-  3. *Public LinkedIn HR Research*: Locates publicly indexed HR Managers, Recruiters, and Talent Specialists with Names, Job Titles, and profile URLs without bypassing authentication.
-  4. *Public Search Indexing*: Cross-references DuckDuckGo public search and directory listings.
-  5. *Verification & Confidence Scoring*: DNS MX mail exchanger validation, RFC syntax check, and 0–95% confidence scoring.
-- **Real-Time Processing Queue**: Live progress bar, current target, page counters, and streaming terminal log viewer.
-- **Rich Results Intelligence Grid**: TanStack-style data table with all 14 columns, multi-field search, status filtering, confidence sliders, column toggles, copy buttons, and full audit detail modals.
-- **Formatted Exports & Templates**: Download styled Excel (`.xlsx`) and `.csv` files, plus downloadable sample templates (`sample_companies_template.xlsx` and `sample_companies_template.csv`).
-- **Ethical & Legal**: 100% public information, zero guessed patterns, zero fake data.
+1. **Crawls the company's own website** (domain-restricted, robots.txt-aware,
+   sitemap-aware, prioritized: `/contact`, `/careers`, `/jobs`, `/team`,
+   `/people`, `/leadership`, `/hr`, `/human-resources`, `/recruitment`,
+   `/work-with-us`…).
+2. **Extracts only real emails** found in page content: `mailto:` links,
+   visible text, obfuscated patterns (`name [at] domain [dot] io`),
+   `data-email` attributes, and JSON-LD structured data.
+3. **Analyses HR context** — an email is only "HR" when there is actual HR
+   evidence (HR-style local part, HR page type, HR wording in the surrounding
+   text). `support@company.com` is *always* reported as a generic company
+   email, never as HR.
+4. **Identifies people** — HR/recruiter names, titles, LinkedIn URLs from
+   JSON-LD and team/careers page text.
+5. **Verifies** every address: syntax → domain → DNS MX (free), optional SMTP
+   probing, or via configured third-party verifiers.
+6. **Falls back** only then to external search indexes and professional-data
+   providers (LinkedIn discovery via *public* search snippets, Apollo; email
+   discovery via Hunter — all returning only data actually returned by those
+   services).
+7. **Scores by evidence**, not by guesswork (see confidence tiers below).
+
+## What it will never do
+
+- 🚫 Generate random HR emails or guess address patterns
+- 🚫 Present `hr@domain.com`-style inferences as real unless literally found
+- 🚫 Assign high confidence to unverified addresses
+- 🚫 Call syntax validation "verification"
+- 🚫 Hide the source of any result
+- 🚫 Scrape LinkedIn behind authentication or bypass access controls
+- 🚫 Silently fail — every failure surfaces in the search log
 
 ---
 
-## 🏗️ Tech Stack
+## Tech stack
 
 | Layer | Technology |
 |---|---|
-| **Frontend** | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS, Lucide Icons |
-| **Backend** | FastAPI, Async Architecture, Pydantic v2 Settings & Models |
-| **Database** | SQLite with Async SQLAlchemy 2.0 (PostgreSQL ready) |
-| **Crawler & Extraction** | `aiohttp`, `httpx`, `BeautifulSoup4`, XML Sitemap Parser, DuckDuckGo Search |
-| **Excel & CSV** | Pandas, OpenPyXL (styled headers & auto-width) |
-| **Verification** | `dnspython` (DNS MX records), `email-validator` (RFC 5322) |
-| **Containerization** | Docker, Docker Compose |
+| Frontend | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS, route groups `(auth)`/`(app)` |
+| Backend | FastAPI (async), SQLAlchemy 2.0, Alembic migrations |
+| Database | PostgreSQL 16 (Docker default) — SQLite fallback for quick local runs |
+| Auth | Email/password (Argon2id), Google OAuth 2.0, JWT in httpOnly cookies, email verification, single-use password reset |
+| CAPTCHA | Cloudflare Turnstile / reCAPTCHA / hCaptcha / built-in dev CAPTCHA |
+| Crawling | httpx + BeautifulSoup (light), optional Playwright Chromium (JS sites), optional Firecrawl API |
+| Verification | dnspython (MX), email-validator (RFC), optional SMTP, Hunter |
+| Providers | Pluggable registry: crawler, search, email finder, verifier, professional data |
 
 ---
 
-## 🚀 Quick Start (Local Development)
+## Quick start
 
-### 1. Prerequisites
-- Python 3.11+
-- Node.js 18+ & npm
-- Git
+### A. Docker Compose (recommended — includes PostgreSQL)
 
-### 2. Backend Setup
 ```bash
-cd backend
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-
-# Run backend API server on port 8000
-python run.py
+cp .env.example .env            # set SECRET_KEY at minimum
+docker compose up --build
 ```
-Backend API will be available at `http://localhost:8000` with Swagger documentation at `http://localhost:8000/docs`.
 
-### 3. Frontend Setup
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000 (Swagger: http://localhost:8000/docs)
+- PostgreSQL persists in the `postgres_data` volume (survives restarts)
+- Migrations run automatically because `RUN_MIGRATIONS=true`
+
+### B. Local development (SQLite, zero dependencies)
+
 ```bash
+# 1. Backend
+cd backend
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+cp ../.env.example .env
+python run.py                       # -> http://localhost:8000
+
+# 2. Frontend (new terminal)
 cd frontend
 npm install
-
-# Run Next.js development server on port 3000
-npm run dev
+npm run dev                         # -> http://localhost:3000
 ```
-Frontend will be available at `http://localhost:3000`.
+
+The Next.js server proxies `/api/v1/*` to the backend, so the browser hits
+same-origin URLs and the httpOnly session cookie keeps working.
+
+### Registering your first account
+
+1. **Register** — complete the CAPTCHA (the default `dev-math` CAPTCHA asks an
+   arithmetic question).
+2. **Verify email** — in dev mode (no SMTP configured) the verification link
+   is printed in the backend log **and returned in the API response/UI**.
+3. Start a search from **New Search**.
 
 ---
 
-## 🐳 Docker Setup
+## Providers: free vs paid
 
-Run the full platform with a single command using Docker Compose:
+| Capability | Free options | Paid options |
+|---|---|---|
+| Website crawling | Built-in HTTP crawler; Playwright Chromium (self-hosted, optional) | Firecrawl |
+| Web search | DuckDuckGo public search | Google Custom Search (100 free queries/day) |
+| Email discovery | Website extraction only (always free) | Hunter.io Domain Search |
+| Email verification | Syntax → domain → DNS MX (built-in); optional SMTP | Hunter.io Email Verifier |
+| Professional / LinkedIn data | Public search-index snippets | Apollo.io |
+
+**Selection logic** (per capability, per user):
+`user-configured provider key (DB)` → `environment variable key` →
+`free built-in default`. One provider failing never aborts a search — the
+orchestrator degrades gracefully and logs the reason.
+
+### API key management (Settings → API Providers)
+
+- Keys entered in the UI are **Fernet-encrypted at rest**, only a masked tail
+  (`••••••••ab12`) ever comes back.
+- Keys can also be provided as env vars (`FIRECRAWL_API_KEY`, `HUNTER_API_KEY`,
+  `APOLLO_API_KEY`, `GOOGLE_SEARCH_API_KEY` + `GOOGLE_SEARCH_ENGINE_ID`).
+- Every provider has a real **Test Connection** button that actually calls the
+  vendor API (latency + result, e.g. Hunter account plan/usage, Firecrawl
+  remaining credits). It never just checks the field is non-empty.
+
+> Tip: the DB-stored key (entered in the UI) always wins over the env var
+> fallback, so different users can use different accounts of the same vendor.
+
+---
+
+## CAPTCHA configuration
+
+`CAPTCHA_PROVIDER` supports:
+
+| Value | Behavior | Required env vars |
+|---|---|---|
+| `dev-math` (default) | Built-in arithmetic challenge | — |
+| `turnstile` | Cloudflare Turnstile widget | `CAPTCHA_SITE_KEY`, `CAPTCHA_SECRET_KEY` |
+| `recaptcha` | Google reCAPTCHA v2 widget | `CAPTCHA_SITE_KEY`, `CAPTCHA_SECRET_KEY` |
+| `hcaptcha` | hCaptcha widget | `CAPTCHA_SITE_KEY`, `CAPTCHA_SECRET_KEY` |
+| `none` | disabled (**testing only**) | — |
+
+Secret verification is always server-side against the vendor's `siteverify`
+endpoint.
+
+## Google OAuth setup
+
+1. Google Cloud Console → Credentials → Create OAuth client (Web).
+2. Authorized redirect URI: `{BACKEND_PUBLIC_URL}/api/v1/auth/google/callback`
+   (e.g. `http://localhost:8000/api/v1/auth/google/callback`).
+3. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+4. The "Continue with Google" button then works end-to-end; Google accounts
+   with a verified email are auto-verified.
+
+## Optional: Playwright browser crawler
+
+Many modern sites render content only with JavaScript. Two fallbacks exist:
 
 ```bash
-docker-compose up --build
+pip install playwright && playwright install chromium
+ENABLE_PLAYWRIGHT=true
 ```
 
-- **Frontend**: `http://localhost:3000`
-- **Backend API**: `http://localhost:8000`
-- **API Docs**: `http://localhost:8000/docs`
+With Docker, rebuild the backend with `INSTALL_PLAYWRIGHT=true` and set
+`ENABLE_PLAYWRIGHT=true`. If neither Playwright nor Firecrawl is available,
+the platform reports `JavaScript rendering required` in the search log
+*instead of silently returning nothing*.
 
 ---
 
-## 📊 Excel & CSV Import/Export Formats
+## Confidence & verification tiers (evidence-based)
 
-### Sample Import Template (`sample_companies_template.xlsx` / `.csv`)
+| Tier | Meaning |
+|---|---|
+| **95–100% · Verified** | Real email found on the official company website **and** MX records valid |
+| **90% · Verified** | Returned by a reliable provider **and** verified (provider-side or MX) |
+| **70–89% · Partially verified / Possible** | Strong evidence, incomplete verification (e.g. MX inconclusive) |
+| **<70% · Possible / Company email** | Real but weakly evidenced; generic mailboxes live here |
+| **0 / hidden** | No evidence — no email is produced at all |
 
-| Company Name | Location | Website | LinkedIn URL |
-|---|---|---|---|
-| Aspire Softserv | Ahmedabad | `https://aspiresoftserv.com` | `https://linkedin.com/company/aspire-softserv` |
-| Simform | Ahmedabad | `https://simform.com` | `https://linkedin.com/company/simform` |
-| Bacancy Technology | Ahmedabad | `https://bacancytechnology.com` | `https://linkedin.com/company/bacancy-technology` |
-| Radixweb | Ahmedabad | `https://radixweb.com` | `https://linkedin.com/company/radixweb` |
-| TatvaSoft | Ahmedabad | `https://tatvasoft.com` | `https://linkedin.com/company/tatvasoft` |
+`verification_status` values: `verified` · `partially_verified` · `unverified`.
+Contact categories: `verified_hr` · `possible_hr` · `company_email` · `linkedin`
+(person identified without email evidence). The UI and Excel export always
+separate these four.
 
-### Structured Export Columns
+## Search pipeline priority
 
-1. **Company Name**: Target organization
-2. **Location**: City or headquarters
-3. **Website**: Official website URL
-4. **LinkedIn**: Company LinkedIn page
-5. **HR Email**: Verified public HR contact (or "Not Publicly Available")
-6. **Recruitment Email**: Talent acquisition contact
-7. **Careers Email**: Careers portal contact
-8. **General Email**: General contact fallback
-9. **HR Name**: Publicly identified HR representative
-10. **HR Position**: Recruiter or HR Manager job title
-11. **LinkedIn Profile**: Public recruiter LinkedIn profile
-12. **Confidence Score**: Traceable confidence metric (95%, 90%, 85%, 70%, 0%)
-13. **Source**: Verifiable public page URL
-14. **Verification Status**: `Verified Public HR Email`, `Verified Recruitment Email`, `Verified Careers Email`, `General Contact Email`, `Not Publicly Available`
-15. **Extraction Date**: UTC timestamp
+```
+User enters company (+ website, location, LinkedIn URL)
+  → official website crawl (HTTP; robots.txt + sitemap + domain restriction)
+  → JS/anti-bot fallback: Playwright → Firecrawl
+  → relevant pages discovered (contact/careers/team/people/leadership/hr…)
+  → real emails extracted with context
+  → HR-context classification (support@ ≠ HR; hr@/careers@/talent@ = HR)
+  → local verification (syntax → domain → MX)
+  → if no verified HR email:
+        external search providers (DDG/Google public index incl. LinkedIn snippets)
+        professional-data providers (Apollo)
+        email-discovery providers (Hunter)
+  → evidence-scored, source-labeled results
+  → else: "No verified HR contact found."
+```
+
+Every search streams a **live progress log** to the UI
+(`✓ Company website loaded`, `✓ 37 internal pages discovered`, `✕ Website
+crawler failed – falling back to browser crawler`…).
+
+## Excel export columns
+
+`Company Name · Website · Location · HR Name · Designation · HR Email ·
+LinkedIn Profile · Source · Source URL · Discovery Method ·
+Verification Status · Confidence · Date Found`
+
+Contacts without email evidence are explicitly marked *"No email evidence"* —
+never fabricated.
 
 ---
 
-## 🧪 Testing
+## Security checklist
 
-Run the automated pytest test suite covering crawlers, email extractors, classifiers, DNS verifiers, Excel importers/exporters, and API endpoints:
+- Argon2id password hashing (OWASP recommended parameters via pwdlib)
+- JWT sessions in httpOnly + SameSite cookies; Bearer tokens supported too
+- Email verification required before searching; single-use reset links
+- CAPTCHA on register/login/forgot-password
+- Per-IP sliding-window rate limiting on auth and search endpoints
+- SQL injection-proof (SQLAlchemy parameterization), strict Pydantic input
+  validation, XSS-safe React rendering, scoped CORS
+- API keys encrypted at rest; only masked tails in API responses
+- Strict per-user data isolation on every endpoint (tested)
+
+## Testing
 
 ```bash
 cd backend
-PYTHONPATH=. /home/user/venv/bin/pytest -v
+PYTHONPATH=. pytest -v
 ```
 
-16 unit and integration test cases verify the extraction engine and API contracts.
+40 tests cover: auth flows (registration, login, CAPTCHA, reset, isolation),
+HR classification rules (support@ never HR), evidence scoring
+(no high confidence without evidence), crawler extraction (mailto/obfuscation/
+JSON-LD/LinkedIn), person identification, provider registry & key encryption,
+and two end-to-end orchestrator runs against realistic fake websites —
+including the "no HR email anywhere ⇒ no_results" honesty path.
 
 ---
 
-## ⚖️ Ethical & Legal Compliance
+## Repository layout
 
-- **Public Data Only**: Collects only publicly accessible information indexed on company websites, careers pages, sitemaps, and public search snippets.
-- **Zero Login Wall Bypassing**: Does not scrape behind authentication or bypass LinkedIn logins.
-- **No Email Guessing**: Never generates guessed email addresses based on patterns. If no verified contact is found, the platform returns `"Not Publicly Available"`.
-- **DNS MX Verified**: Every extracted email domain is validated for active mail exchanger records.
-
----
-
-## 🚀 Major System Upgrade (v2) – Completed
-
-**Implemented on branch `arena/019fe14f-job-hunting`**
-
-### 1. User Authentication System
-- Google OAuth + Email/Password with bcrypt
-- Cryptographic visual/math CAPTCHA on registration/login
-- JWT + HTTP-only cookies, protected routes
-- Complete user data isolation (companies, searches, contacts)
-
-### 2. Real Database Architecture
-- PostgreSQL / SQLite with Async SQLAlchemy 2.0
-- Tables: `users`, `companies`, `searches`, `hr_contacts`, `api_providers`
-- Updated `docker-compose.yml` with full local stack
-
-### 3. ZERO Fake/Guessed Emails (Evidence-First)
-- 100% elimination of synthetic email generation
-- Strict “No verified HR email found.” + 0% confidence when no evidence
-- Full Source, Source URL, Verification Status displayed for every result
-
-### 4. Pluggable Provider Management
-- Abstract providers: Web Crawling, Search, Email Discovery, Verifier
-- Live “Test Connection” buttons in Settings (returns balance + latency)
-- API keys encrypted at rest and masked in UI
-
-### 5. Full-Stack Next.js 16 + FastAPI
-- Next.js 16 (App Router), React 19, TypeScript, Tailwind, Lucide, Dark Mode
-- Dashboard, Drag & Drop, Manual Grid, Live Queue + streaming logs, Results Table + Excel/CSV export
-- Comprehensive pytest suite (all tests passing)
-
-**Status**: Fully implemented, tested, and ready for production.
+```
+backend/
+  alembic/                 # DB migrations
+  app/
+    api/endpoints/         # auth, searches, contacts, providers, export, dashboard, health
+    core/                  # config, security (JWT/passwords), crypto, deps, rate limiting
+    models/                # users, companies, searches, search_logs, hr_contacts, api_providers, auth_tokens
+    services/
+      crawler/             # http_crawler, browser_crawler (Playwright), sitemap, page_classifier
+      extraction/          # HR context classifier, people identification, LinkedIn snippets
+      verification/        # free local verifier (syntax/domain/MX/SMTP)
+      providers/           # builtin, firecrawl, google/ddg search, hunter, apollo + registry/manager
+      orchestrator.py      # evidence-first pipeline
+      worker.py            # background search jobs
+      excel.py             # import (fuzzy columns) + styled export
+frontend/
+  src/app/(auth)/          # login, register, forgot/reset, verify-email
+  src/app/(app)/           # dashboard, new-search, searches/[id], results, settings
+  src/components/          # AppShell (nav/sidebar/guard), provider cards, contact cards, live logs
+docker-compose.yml         # frontend + backend + PostgreSQL
+.env.example               # every tunable, documented
+```

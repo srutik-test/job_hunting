@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Navbar from "../components/layout/Navbar";
-import Sidebar from "../components/layout/Sidebar";
+import { AuthProvider } from "../contexts/AuthContext";
 
 export const metadata: Metadata = {
-  title: "HR & Recruitment Contact Intelligence Platform",
+  title: "HR Contact Intelligence Platform",
   description:
-    "Production-ready platform to extract verified public HR and recruitment contacts from company websites and public LinkedIn profiles.",
+    "Evidence-first discovery of real, verified HR & recruitment contacts. " +
+    "No generated emails, no guessed confidence scores.",
 };
 
 export default function RootLayout({
@@ -15,15 +15,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased">
-        <Navbar />
-        <div className="flex min-h-[calc(100vh-4rem)] max-w-7xl mx-auto w-full">
-          <Sidebar />
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
-            {children}
-          </main>
-        </div>
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );
