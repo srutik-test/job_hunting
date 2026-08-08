@@ -1,396 +1,381 @@
 """
-High-Performance Asynchronous HTTP Crawler.
-Recursively crawls company websites with smart priority scheduling for careers, team, and contact pages.
+Domain-restricted asynchronous HTTP crawler.
+
+Guarantees:
+* Stays on the company's own domain (and sub-domains) only.
+* Honours robots.txt when CRAWLER_RESPECT_ROBOTS is enabled.
+* Deduplicates URLs, follows redirects, caps the number of pages,
+  handles common HTTP errors and never loops forever.
+* Flags JavaScript-heavy pages (result.needs_js) so the orchestrator can
+  fall back to a browser-based provider.
 """
 
-import asyncio
+import json
 import re
 import time
-from typing import Set, List, Dict, Optional, Callable, Any
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
 from urllib.parse import urljoin, urlparse, urldefrag
+
 import httpx
 from bs4 import BeautifulSoup
-import json
 
-from app.services.crawler.base import BaseCrawler, CrawlResult, CrawledPage
+from app.core.config import settings
+from app.services.crawler.base import CrawledPage, CrawlResult
 from app.services.crawler.page_classifier import (
     classify_page_type,
     get_url_crawl_priority,
     is_internal_url,
 )
-from app.services.crawler.sitemap_parser import SitemapParser
-from app.core.config import settings
+from app.services.crawler.sitemap import SitemapParser
 
-# Pre-compiled email extraction regex for high-speed scanning
-EMAIL_REGEX = re.compile(
-    r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", re.IGNORECASE
+EMAIL_REGEX = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", re.I)
+OBFUSCATED = re.compile(
+    r"([a-zA-Z0-9_.+-]+)\s*(?:\[at\]|\(at\)|\{at\}|\s+at\s+|\s+AT\s+)"
+    r"\s*([a-zA-Z0-9-]+)\s*(?:\[dot\]|\(dot\)|\{dot\}|\s+dot\s+|\.)\s*([a-zA-Z0-9-.]+)",
+    re.I,
 )
-
-# Obfuscated email patterns like name [at] domain [dot] com
-OBFUSCATED_EMAIL_REGEX = re.compile(
-    r"([a-zA-Z0-9_.+-]+)\s*(?:\[at\]|\(at\)|\s+at\s+|@)\s*([a-zA-Z0-9-]+)\s*(?:\[dot\]|\(dot\)|\s+dot\s+|\.)\s*([a-zA-Z0-9-.]+)",
-    re.IGNORECASE,
+EMAIL_ATTR_REGEX = re.compile(
+    r'(?:data-email|data-mail|data-address)\s*=\s*["\']([^"\']+)["\']', re.I
 )
-
-# Public LinkedIn company and profile URLs
-LINKEDIN_URL_REGEX = re.compile(
-    r"https?://(?:www\.)?linkedin\.com/(?:company|in|pub|school)/[a-zA-Z0-9_-]+/?",
-    re.IGNORECASE,
+LINKEDIN_RE = re.compile(
+    r"https?://(?:[\w.-]+\.)?linkedin\.com/(?:company|in|pub|school)/[a-zA-Z0-9_-]+/?",
+    re.I,
 )
+BLOCK_MARKERS = [
+    "cf-error", "cf-browser-verification", "attention required! | cloudflare",
+    "checking your browser", "just a moment", "ddos-guard", "px-captcha",
+    "akamai", "access denied | robots", "perimeterx",
+]
+
+ProgressCallback = Optional[Callable[[Dict[str, Any]], Awaitable[Optional[bool]]]]
+# callback receives {current_page, pages_crawled, emails_count}; if it returns
+# False the crawl is cancelled cooperatively.
 
 
-class AsyncHttpCrawler(BaseCrawler):
-    """Production-ready asynchronous web crawler."""
+def valid_email_candidate(email: str) -> bool:
+    """Reject asset files, templates and obviously invalid matches."""
+    if not email or len(email) < 6 or len(email) > 100:
+        return False
+    bad_endings = (
+        ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".css", ".js",
+        ".woff", ".woff2", ".ttf", ".eot", ".mp4", ".ico", ".pdf", ".html",
+    )
+    if email.endswith(bad_endings):
+        return False
+    parts = email.split("@")
+    if len(parts) != 2 or "." not in parts[1]:
+        return False
+    if parts[1] in ("example.com", "example.org", "domain.com", "email.com",
+                    "sample.com", "test.com", "sentry.io", "sentry.wixpress.com"):
+        return False
+    # hash-like local parts on sentry noise domains
+    if re.fullmatch(r"u?[0-9a-f]{5,}", parts[0]) and parts[1].endswith("sentry.io"):
+        return False
+    return True
 
-    def __init__(
-        self,
-        timeout: float = 15.0,
-        max_retries: int = 2,
-        user_agent: Optional[str] = None,
-    ):
+
+class HttpCrawler:
+    engine = "http"
+
+    def __init__(self, timeout: float = 15.0, max_pages: int = 30,
+                 user_agent: Optional[str] = None):
         self.timeout = timeout
-        self.max_retries = max_retries
+        self.max_pages = max_pages
         self.user_agent = user_agent or settings.CRAWLER_USER_AGENT
-        self.sitemap_parser = SitemapParser(timeout=10.0, user_agent=self.user_agent)
+        self.sitemap = SitemapParser(timeout=10.0, user_agent=self.user_agent)
 
     async def crawl_company(
-        self,
-        base_url: str,
-        company_name: str,
-        max_pages: int = 25,
-        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        self, base_url: str, company_name: str = "",
+        progress_callback: ProgressCallback = None,
     ) -> CrawlResult:
-        """
-        Recursively crawl the target company website up to max_pages.
-        Prioritizes Careers, Jobs, Hiring, Contact, Team, Leadership, People, and Sitemap.
-        """
-        start_time = time.time()
-
-        # Ensure scheme
+        start = time.time()
         if not base_url.startswith(("http://", "https://")):
             base_url = "https://" + base_url
         base_url = base_url.rstrip("/")
+        base_domain = (urlparse(base_url).netloc or "").lower().removeprefix("www.")
 
-        parsed_base = urlparse(base_url)
-        base_domain = parsed_base.netloc.lower().replace("www.", "")
-
-        visited_urls: Set[str] = set()
-        to_visit: List[tuple[int, str]] = []  # (priority, url)
-        crawled_pages: List[CrawledPage] = []
+        visited: Set[str] = set()
+        queue: List[tuple[int, str]] = []
+        pages: List[CrawledPage] = []
         all_emails: Set[str] = set()
-        all_linkedin_urls: Set[str] = set()
+        all_li: Set[str] = set()
         errors: List[str] = []
+        robots_disallowed = 0
+        needs_js = False
+        blocked = False
+        blocked_reason = ""
 
         headers = {
             "User-Agent": self.user_agent,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9",
-            "Connection": "keep-alive",
         }
-
-        transport = httpx.AsyncHTTPTransport(retries=self.max_retries, verify=False)
+        transport = httpx.AsyncHTTPTransport(retries=settings.CRAWLER_MAX_RETRIES)
         async with httpx.AsyncClient(
-            transport=transport,
-            headers=headers,
-            timeout=self.timeout,
+            transport=transport, headers=headers, timeout=self.timeout,
             follow_redirects=True,
-            limits=httpx.Limits(max_keepalive_connections=10, max_connections=20),
+            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
         ) as client:
+            # robots.txt
+            robots = await self._load_robots(base_url, base_domain, client)
 
-            # Step 1: Add homepage with highest priority
-            to_visit.append((100, base_url))
+            queue.append((100, base_url))
+            for path in (
+                "/contact", "/contact-us", "/careers", "/career", "/jobs",
+                "/about", "/about-us", "/team", "/our-team", "/people",
+                "/leadership", "/hr", "/human-resources", "/recruitment",
+                "/work-with-us", "/join-us",
+            ):
+                queue.append((90, urljoin(base_url, path)))
 
-            # Step 2: Discover standard career and contact endpoints explicitly
-            candidate_paths = [
-                "/careers",
-                "/career",
-                "/jobs",
-                "/job",
-                "/hiring",
-                "/work-with-us",
-                "/join-us",
-                "/join-our-team",
-                "/openings",
-                "/contact",
-                "/contact-us",
-                "/contactus",
-                "/about",
-                "/about-us",
-                "/team",
-                "/our-team",
-                "/leadership",
-                "/people",
-                "/departments",
-            ]
-            for path in candidate_paths:
-                cand_url = urljoin(base_url, path)
-                to_visit.append((90, cand_url))
-
-            # Step 3: Fast sitemap discovery
             try:
-                sitemap_urls = await self.sitemap_parser.discover_sitemap_urls(
+                sitemap_urls, sitemap_found = await self.sitemap.discover_sitemap_urls(
                     base_url, client
                 )
-                for s_url in sitemap_urls:
-                    prio = get_url_crawl_priority(s_url)
-                    to_visit.append((prio + 20, s_url))
-            except Exception as e:
-                errors.append(f"Sitemap check error: {str(e)}")
+            except Exception as exc:
+                sitemap_urls, sitemap_found = [], False
+                errors.append(f"Sitemap discovery failed: {exc}")
 
-            # Crawl loop
-            while to_visit and len(crawled_pages) < max_pages:
-                # Pop highest priority URL
-                to_visit.sort(key=lambda x: x[0], reverse=True)
-                prio, current_url = to_visit.pop(0)
+            for u in sitemap_urls:
+                prio = get_url_crawl_priority(u)
+                if prio > 0:
+                    queue.append((prio + 20, u))
 
-                # Normalize & clean URL
-                current_url, _ = urldefrag(current_url)
-                current_url = current_url.rstrip("/")
-
-                if not current_url or current_url in visited_urls:
+            while queue and len(pages) < self.max_pages:
+                queue.sort(key=lambda x: x[0], reverse=True)
+                _, current = queue.pop(0)
+                current, _frag = urldefrag(current)
+                current = current.rstrip("/")
+                if not current or current in visited:
+                    continue
+                if not is_internal_url(base_domain, current):
+                    continue
+                if robots is not None and not robots.can_fetch(
+                    self.user_agent, current
+                ):
+                    robots_disallowed += 1
                     continue
 
-                if not is_internal_url(base_domain, current_url):
-                    continue
-
-                visited_urls.add(current_url)
+                visited.add(current)
 
                 if progress_callback:
-                    try:
-                        progress_callback(
-                            {
-                                "current_page": current_url,
-                                "pages_crawled": len(crawled_pages),
-                                "emails_count": len(all_emails),
-                                "profiles_count": len(all_linkedin_urls),
-                            }
-                        )
-                    except Exception:
-                        pass
+                    keep_going = await progress_callback(
+                        {
+                            "current_page": current,
+                            "pages_crawled": len(pages),
+                            "emails_count": len(all_emails),
+                        }
+                    )
+                    if keep_going is False:
+                        errors.append("Crawl cancelled.")
+                        break
 
                 try:
-                    resp = await client.get(current_url)
-                    status_code = resp.status_code
+                    resp = await client.get(current)
+                except httpx.TimeoutException:
+                    errors.append(f"Timeout fetching {current}")
+                    continue
+                except httpx.RequestError as exc:
+                    errors.append(f"Fetch error on {current}: {exc.__class__.__name__}")
+                    continue
 
-                    # Only process HTML responses
-                    content_type = resp.headers.get("content-type", "").lower()
-                    if (
-                        "text/html" not in content_type
-                        and "application/xhtml" not in content_type
-                    ):
-                        continue
+                status = resp.status_code
+                if status in (401, 403):
+                    errors.append(f"HTTP {status} (blocked) on {current}")
+                    if status == 403 and not blocked:
+                        body_lower = resp.text[:2000].lower() if resp.text else ""
+                        if any(m in body_lower for m in BLOCK_MARKERS):
+                            blocked = True
+                            blocked_reason = "Anti-bot protection detected (HTTP 403)."
+                    continue
+                if status == 429:
+                    errors.append(f"Rate-limited (429) on {current}")
+                    continue
+                if status >= 400:
+                    continue
 
-                    html = resp.text
-                    soup = BeautifulSoup(html, "html.parser")
+                ctype = resp.headers.get("content-type", "").lower()
+                html = resp.text if resp.status_code else ""
+                is_html = (
+                    "text/html" in ctype or "application/xhtml" in ctype
+                    or (html.lstrip()[:15].lower().startswith(
+                        ("<!doctype html", "<html")))
+                )
+                if not is_html:
+                    continue
+                body_lower = html[:3000].lower()
+                if not blocked and any(m in body_lower for m in BLOCK_MARKERS):
+                    blocked = True
+                    blocked_reason = "Anti-bot protection detected in page content."
 
-                    # Extract title & meta
-                    title = (
-                        soup.title.string.strip()
-                        if soup.title and soup.title.string
-                        else ""
-                    )
-                    meta_desc = ""
-                    desc_tag = soup.find(
-                        "meta", attrs={"name": "description"}
-                    ) or soup.find("meta", attrs={"property": "og:description"})
-                    if desc_tag and desc_tag.get("content"):
-                        meta_desc = desc_tag["content"].strip()
+                page = self._parse_page(current, status, html, base_domain)
 
-                    # Classify page type
-                    page_type = classify_page_type(current_url, title, meta_desc)
+                # JS-only heuristic: tiny visible text + heavy script usage
+                if len(page.text_content) < 220 and ("__NEXT_DATA__" in html or
+                    "<div id=\"app\"></div>" in html or "<div id=\"root\"></div>" in html or
+                    html.count("<script") > 12):
+                    needs_js = True
 
-                    # Extract text content
-                    for script_or_style in soup(["script", "style", "noscript", "svg"]):
-                        script_or_style.extract()
-                    visible_text = soup.get_text(separator=" ", strip=True)
+                pages.append(page)
+                all_emails.update(page.emails)
+                all_li.update(page.linkedin_urls)
 
-                    # 1. Direct Regex Email Search on visible text and raw HTML
-                    page_emails = set()
-                    for em in EMAIL_REGEX.findall(html):
-                        cleaned_em = em.strip().lower().rstrip(".,;:'\"")
-                        if self._is_valid_email_candidate(cleaned_em, base_domain):
-                            page_emails.add(cleaned_em)
+                # secondary internal links from the page (already-pruned)
+                for link in page.links:
+                    if link not in visited and is_internal_url(base_domain, link):
+                        prio = get_url_crawl_priority(link)
+                        if prio > 0:
+                            queue.append((prio, link))
 
-                    # 2. Extract mailto: links
-                    for mailto in soup.select('a[href^="mailto:"]'):
-                        href = mailto.get("href", "")
-                        raw_email = (
-                            href.replace("mailto:", "").split("?")[0].strip().lower()
-                        )
-                        if self._is_valid_email_candidate(raw_email, base_domain):
-                            page_emails.add(raw_email)
-
-                    # 3. Obfuscated email patterns
-                    for match in OBFUSCATED_EMAIL_REGEX.finditer(visible_text):
-                        u, d, t = match.groups()
-                        obf_email = f"{u}@{d}.{t}".strip().lower()
-                        if self._is_valid_email_candidate(obf_email, base_domain):
-                            page_emails.add(obf_email)
-
-                    all_emails.update(page_emails)
-
-                    # Extract LinkedIn Profile & Company Links
-                    page_linkedin = set()
-                    for a in soup.find_all("a", href=True):
-                        href = a["href"].strip()
-                        if "linkedin.com" in href.lower():
-                            clean_li = self._clean_linkedin_url(href)
-                            if clean_li:
-                                page_linkedin.add(clean_li)
-
-                    all_linkedin_urls.update(page_linkedin)
-
-                    # Extract JSON-LD structured data (Person, JobPosting, ContactPoint)
-                    json_ld_list = []
-                    for script in soup.find_all("script", type="application/ld+json"):
-                        try:
-                            if script.string:
-                                data = json.loads(script.string)
-                                if isinstance(data, dict):
-                                    json_ld_list.append(data)
-                                    # Scan for email inside json_ld
-                                    self._extract_jsonld_emails(
-                                        data, page_emails, base_domain
-                                    )
-                                elif isinstance(data, list):
-                                    for item in data:
-                                        if isinstance(item, dict):
-                                            json_ld_list.append(item)
-                                            self._extract_jsonld_emails(
-                                                item, page_emails, base_domain
-                                            )
-                        except Exception:
-                            pass
-
-                    # Discover next links
-                    page_links = []
-                    for a in soup.find_all("a", href=True):
-                        href = a["href"].strip()
-                        full_url = urljoin(current_url, href)
-                        full_url, _ = urldefrag(full_url)
-                        full_url = full_url.rstrip("/")
-
-                        if (
-                            is_internal_url(base_domain, full_url)
-                            and full_url not in visited_urls
-                        ):
-                            prio = get_url_crawl_priority(full_url)
-                            if prio >= 0:
-                                page_links.append(full_url)
-                                to_visit.append((prio, full_url))
-
-                    # Record page
-                    crawled_pages.append(
-                        CrawledPage(
-                            url=current_url,
-                            status_code=status_code,
-                            title=title,
-                            text_content=visible_text[
-                                :10000
-                            ],  # Keep first 10k chars for performance
-                            html_content="",  # Don't keep raw HTML in memory to save RAM
-                            links=page_links[:30],
-                            page_type=page_type,
-                            discovered_emails=list(page_emails),
-                            discovered_linkedin_urls=list(page_linkedin),
-                            meta_description=meta_desc,
-                            json_ld_data=json_ld_list,
-                        )
-                    )
-
-                    # Modest sleep between pages to be polite to target servers
-                    await asyncio.sleep(0.05)
-
-                except Exception as e:
-                    errors.append(f"Error crawling {current_url}: {str(e)}")
-
-        duration = time.time() - start_time
-        return CrawlResult(
+        result = CrawlResult(
             base_url=base_url,
-            pages_crawled=len(crawled_pages),
-            pages=crawled_pages,
+            base_domain=base_domain,
+            pages=pages,
+            pages_crawled=len(pages),
             all_emails=all_emails,
-            all_linkedin_urls=all_linkedin_urls,
-            sitemap_found=bool(sitemap_urls if "sitemap_urls" in locals() else False),
-            duration_seconds=round(duration, 2),
+            all_linkedin_urls=all_li,
+            sitemap_found=sitemap_found,
+            robots_disallowed=robots_disallowed,
+            needs_js=needs_js,
+            blocked=blocked,
+            blocked_reason=blocked_reason,
+            duration_seconds=round(time.time() - start, 2),
             errors=errors,
+            engine=self.engine,
         )
+        return result
 
-    def _is_valid_email_candidate(self, email: str, base_domain: str) -> bool:
-        """Validate email string structure and filter common asset false positives."""
-        if not email or "@" not in email:
-            return False
-
-        # Filter common file extension matches (e.g. image@2x.png, bootstrap@5.3.min.css)
-        invalid_endings = (
-            ".png",
-            ".jpg",
-            ".jpeg",
-            ".gif",
-            ".webp",
-            ".svg",
-            ".css",
-            ".js",
-            ".woff",
-            ".woff2",
-            ".ttf",
-            ".eot",
-            ".mp4",
-            ".ico",
-            ".pdf",
-        )
-        if email.endswith(invalid_endings):
-            return False
-
-        if len(email) < 6 or len(email) > 100:
-            return False
-
-        # Domain part must have a dot
-        parts = email.split("@")
-        if len(parts) != 2 or "." not in parts[1]:
-            return False
-
-        # Ignore template examples like name@domain.com, you@example.com
-        if parts[1] in (
-            "example.com",
-            "domain.com",
-            "yoursite.com",
-            "email.com",
-            "sample.com",
-        ):
-            return False
-
-        return True
-
-    def _clean_linkedin_url(self, url: str) -> Optional[str]:
-        """Normalize LinkedIn URL."""
-        if not url:
+    # ---------------------------------------------------------------- helpers
+    async def _load_robots(self, base_url: str, base_domain: str,
+                           client: httpx.AsyncClient):
+        if not settings.CRAWLER_RESPECT_ROBOTS:
             return None
-        # Remove tracking parameters
-        clean = url.split("?")[0].rstrip("/")
-        if (
-            "linkedin.com/in/" in clean
-            or "linkedin.com/company/" in clean
-            or "linkedin.com/school/" in clean
-        ):
-            if not clean.startswith(("http://", "https://")):
-                clean = "https://" + clean
-            return clean
-        return None
+        try:
+            from urllib.robotparser import RobotFileParser
 
-    def _extract_jsonld_emails(
-        self, data: Dict[str, Any], emails_set: Set[str], base_domain: str
-    ) -> None:
-        """Extract email fields from JSON-LD schema objects."""
+            resp = await client.get(f"{base_url}/robots.txt", timeout=8.0)
+            if resp.status_code != 200:
+                return None
+            rp = RobotFileParser()
+            rp.parse(resp.text.splitlines())
+            return rp
+        except Exception:
+            return None
+
+    def _parse_page(self, url: str, status: int, html: str,
+                    base_domain: str) -> CrawledPage:
+        soup = BeautifulSoup(html, "lxml") if html else None
+        title, meta_desc = "", ""
+        json_ld: List[Dict[str, Any]] = []
+
+        if soup:
+            if soup.title and soup.title.string:
+                title = soup.title.string.strip()
+            desc = soup.find("meta", attrs={"name": "description"}) or soup.find(
+                "meta", attrs={"property": "og:description"}
+            )
+            if desc and desc.get("content"):
+                meta_desc = desc["content"].strip()
+            for tag in soup.find_all("script", attrs={"type": "application/ld+json"}):
+                try:
+                    if tag.string:
+                        data = json.loads(tag.string)
+                        json_ld.append(data)
+                except (ValueError, TypeError):
+                    continue
+
+        page_type = classify_page_type(url, title, meta_desc)
+
+        # ---- email extraction with context
+        emails: Set[str] = set()
+        contexts: List[Dict[str, str]] = []
+
+        # 1) mailto: links (highest signal) — capture nearby context
+        if soup:
+            for a in soup.select('a[href^="mailto:"]'):
+                href = a.get("href", "")
+                raw = href.replace("mailto:", "").split("?")[0].strip().lower()
+                if valid_email_candidate(raw):
+                    emails.add(raw)
+                    parent_text = " ".join(
+                        (a.parent.get_text(" ", strip=True) if a.parent else
+                         a.get_text(" ", strip=True)).split()
+                    )[:400]
+                    contexts.append({"email": raw, "context": parent_text})
+
+        # 2) raw HTML + visible text regex (catches cfemail-free text; also manifests etc.)
+        visible_text = ""
+        if soup:
+            for junk in soup(["script", "style", "noscript"]):
+                junk.decompose()
+            visible_text = soup.get_text(" ", strip=True)
+
+        for em in EMAIL_REGEX.findall(html):
+            cleaned = em.strip().lower().rstrip(".,;:'\"")
+            if valid_email_candidate(cleaned):
+                emails.add(cleaned)
+
+        for match in OBFUSCATED.finditer(visible_text):
+            u, d, t = match.groups()
+            cand = f"{u}@{d}.{t}".strip().lower()
+            if valid_email_candidate(cand):
+                emails.add(cand)
+
+        # 3) attribute-based (data-email, obfuscation schemes)
+        for raw in EMAIL_ATTR_REGEX.findall(html):
+            cand = raw.replace("[at]", "@").replace("[dot]", ".").strip().lower()
+            for em in EMAIL_REGEX.findall(cand):
+                if valid_email_candidate(em):
+                    emails.add(em)
+
+        # 4) JSON-LD Person/Organization emails
+        self._jsonld_emails(json_ld, emails)
+
+        # text context for emails found via raw regex (rough window)
+        for em in emails - {c["email"] for c in contexts}:
+            idx = visible_text.lower().find(em)
+            window = ""
+            if idx != -1:
+                window = visible_text[max(0, idx - 180): idx + len(em) + 180]
+            contexts.append({"email": em, "context": window})
+
+        # ---- internal links
+        links: Set[str] = set()
+        if BeautifulSoup and soup:
+            for tag in soup.find_all("a", href=True):
+                href = tag["href"].strip()
+                if href.startswith(("mailto:", "tel:", "javascript:", "#")):
+                    continue
+                absolute = urljoin(url, href)
+                absolute, _f = urldefrag(absolute)
+                links.add(absolute.rstrip("/"))
+
+        # ---- LinkedIn urls
+        linkedin: Set[str] = set()
+        for m in LINKEDIN_RE.findall(html):
+            clean = m.split("?")[0].rstrip("/")
+            if clean:
+                linkedin.add(clean)
+
+        return CrawledPage(
+            url=url, status_code=status, title=title,
+            text_content=visible_text[:60000], html_content="",
+            links=list(links)[:200], page_type=page_type,
+            emails=sorted(emails), linkedin_urls=sorted(linkedin),
+            meta_description=meta_desc, json_ld=json_ld,
+            email_contexts=contexts,
+        )
+
+    @staticmethod
+    def _jsonld_emails(data: Any, out: Set[str]) -> None:
         if isinstance(data, dict):
             for k, v in data.items():
                 if k.lower() == "email" and isinstance(v, str):
-                    clean = v.strip().lower()
-                    if self._is_valid_email_candidate(clean, base_domain):
-                        emails_set.add(clean)
+                    cand = v.strip().lower()
+                    if valid_email_candidate(cand):
+                        out.add(cand)
                 elif isinstance(v, (dict, list)):
-                    self._extract_jsonld_emails(v, emails_set, base_domain)
+                    HttpCrawler._jsonld_emails(v, out)
         elif isinstance(data, list):
             for item in data:
-                if isinstance(item, (dict, list)):
-                    self._extract_jsonld_emails(item, emails_set, base_domain)
+                HttpCrawler._jsonld_emails(item, out)

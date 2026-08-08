@@ -1,71 +1,95 @@
-"""
-Integration tests for FastAPI endpoints using TestClient.
-"""
+"""API-level tests: user isolation, dashboard, export, company management."""
 
 import pytest
-from starlette.testclient import TestClient
-from app.main import app
-from app.services.excel.importer import ExcelImporter
+
+from tests.conftest import register_and_verify
 
 
-@pytest.fixture
-def client():
-    with TestClient(app) as c:
-        yield c
+@pytest.mark.asyncio
+async def test_data_isolation_between_users(client):
+    ac, Session = client
+    await register_and_verify(ac, Session, email="one@example.com")
+
+    resp = await ac.post("/api/v1/searches", json={
+        "companies": [{"name": "Isol Corp", "website": "https://isol.example.com"}],
+    })
+    assert resp.status_code == 201
+    search_id = resp.json()[0]["id"]
+
+    await ac.post("/api/v1/auth/logout")
+    await register_and_verify(ac, Session, email="two@example.com")
+
+    # second user cannot see the first user's data
+    assert (await ac.get(f"/api/v1/searches/{search_id}")).status_code == 404
+    assert (await ac.get(f"/api/v1/searches/{search_id}/logs")).status_code == 404
+    companies = (await ac.get("/api/v1/companies")).json()
+    assert all(c["name"] != "Isol Corp" for c in companies)
 
 
-def test_health_endpoint(client):
-    response = client.get("/api/v1/health")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "healthy"
-    assert data["features"]["recursive_crawler"] is True
+@pytest.mark.asyncio
+async def test_dashboard_stats_shape(client):
+    ac, Session = client
+    await register_and_verify(ac, Session)
+    resp = await ac.get("/api/v1/dashboard")
+    assert resp.status_code == 200
+    data = resp.json()
+    for key in ("total_companies", "total_searches", "verified_contacts",
+                "searches_failed", "linkedin_profiles"):
+        assert key in data
 
 
-def test_stats_endpoint(client):
-    response = client.get("/api/v1/jobs/stats")
-    assert response.status_code == 200
-    data = response.json()
-    assert "total_jobs" in data
-    assert "total_verified_hr_emails" in data
+@pytest.mark.asyncio
+async def test_invalid_website_rejected(client):
+    ac, Session = client
+    await register_and_verify(ac, Session)
+    resp = await ac.post("/api/v1/searches", json={
+        "companies": [{"name": "Broken", "website": "::::"}],
+    })
+    assert resp.status_code == 422
 
 
-def test_sample_template_downloads(client):
-    res_xlsx = client.get("/api/v1/export/sample-template")
-    assert res_xlsx.status_code == 200
-    assert len(res_xlsx.content) > 100
-
-    res_csv = client.get("/api/v1/export/sample-csv")
-    assert res_csv.status_code == 200
-    assert "Aspire Softserv" in res_csv.text
-
-
-def test_manual_start_extraction(client):
-    payload = {
-        "companies": [
-            {
-                "name": "Aspire Softserv",
-                "location": "Ahmedabad",
-                "website": "https://aspiresoftserv.com",
-                "linkedin_url": "https://linkedin.com/company/aspire-softserv",
-            }
-        ],
-        "crawler_engine": "auto",
-        "enable_public_search": False,
-        "max_pages_per_company": 5,
-    }
-    response = client.post("/api/v1/companies/manual-start", json=payload)
-    assert response.status_code == 200
-    data = response.json()
-    assert "job_id" in data
-    assert data["total_companies"] == 1
+@pytest.mark.asyncio
+async def test_upload_rejects_bad_file(client):
+    ac, Session = client
+    await register_and_verify(ac, Session)
+    resp = await ac.post(
+        "/api/v1/searches/upload",
+        files={"file": ("bad.xlsx", b"not an excel", "application/vnd.ms-excel")},
+    )
+    assert resp.status_code == 422
 
 
-def test_upload_preview_endpoint(client):
-    sample_csv = ExcelImporter.generate_sample_csv().encode("utf-8")
-    files = {"file": ("test.csv", sample_csv, "text/csv")}
-    response = client.post("/api/v1/companies/upload-preview", files=files)
-    assert response.status_code == 200
-    data = response.json()
-    assert data["valid_count"] >= 5
-    assert "Company Name" in data["detected_columns"]
+@pytest.mark.asyncio
+async def test_upload_parses_csv_and_creates_searches(client):
+    ac, Session = client
+    await register_and_verify(ac, Session)
+    csv_content = (
+        "Company Name,Location,Website\n"
+        "Acme Ltd,Ahmedabad,https://acme.example.com\n"
+        "Beta GmbH,Berlin,https://beta.example.de\n"
+    ).encode()
+    resp = await ac.post(
+        "/api/v1/searches/upload",
+        files={"file": ("companies.csv", csv_content, "text/csv")},
+    )
+    assert resp.status_code == 201, resp.text
+    searches = resp.json()
+    assert len(searches) == 2
+    assert searches[0]["company"]["name"] in ("Acme Ltd", "Beta GmbH")
+
+
+@pytest.mark.asyncio
+async def test_excel_export_empty_returns_404(client):
+    ac, Session = client
+    await register_and_verify(ac, Session)
+    resp = await ac.get("/api/v1/export/excel")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_sample_template_download(client):
+    ac, Session = client
+    await register_and_verify(ac, Session)
+    resp = await ac.get("/api/v1/export/template")
+    assert resp.status_code == 200
+    assert resp.content[:2] == b"PK"  # xlsx zip signature

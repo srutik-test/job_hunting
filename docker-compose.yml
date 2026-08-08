@@ -1,27 +1,84 @@
+# Full-stack development environment.
+#
+#   docker compose up --build
+#
+# Frontend: http://localhost:3000   Backend: http://localhost:8000 (docs /docs)
+# PostgreSQL data persists across restarts in the `postgres_data` volume.
+
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: hr_platform_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: hr_platform
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d hr_platform"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        INSTALL_PLAYWRIGHT: "false"   # set "true" to enable the browser crawler
+    container_name: hr_platform_backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/hr_platform
+      RUN_MIGRATIONS: "true"
+      FRONTEND_URL: http://localhost:3000
+      BACKEND_PUBLIC_URL: http://localhost:8000
+      CORS_ORIGINS: '["http://localhost:3000","http://127.0.0.1:3000"]'
+      # Override everything below via a local .env / docker-compose override file.
+      SECRET_KEY: ${SECRET_KEY:-dev-insecure-secret-change-me-in-production}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      CAPTCHA_PROVIDER: ${CAPTCHA_PROVIDER:-dev-math}
+      CAPTCHA_SECRET_KEY: ${CAPTCHA_SECRET_KEY:-}
+      CAPTCHA_SITE_KEY: ${CAPTCHA_SITE_KEY:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-no-reply@hr-platform.local}
+      FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY:-}
+      HUNTER_API_KEY: ${HUNTER_API_KEY:-}
+      APOLLO_API_KEY: ${APOLLO_API_KEY:-}
+      GOOGLE_SEARCH_API_KEY: ${GOOGLE_SEARCH_API_KEY:-}
+      GOOGLE_SEARCH_ENGINE_ID: ${GOOGLE_SEARCH_ENGINE_ID:-}
+      ENABLE_PLAYWRIGHT: ${ENABLE_PLAYWRIGHT:-false}
+      DEBUG: "false"
+      ENVIRONMENT: production
     ports:
       - "8000:8000"
-    environment:
-      - DATABASE_URL=sqlite+aiosqlite:///./data/hr_contacts.db
-      - CRAWLER_MAX_CONCURRENCY=5
-      - CRAWLER_TIMEOUT_SECONDS=15
-      - ENABLE_SEARCH_ENGINE=true
-    volumes:
-      - ./backend/data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    container_name: hr_platform_frontend
+    environment:
+      # The Next.js server proxies /api/v1/* to the backend (see next.config.mjs),
+      # so the browser never needs a direct, CORS-laden connection.
+      API_INTERNAL_URL: http://backend:8000
     ports:
       - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://backend:8000/api/v1
     depends_on:
       - backend
     restart: unless-stopped
+
+volumes:
+  postgres_data:

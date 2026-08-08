@@ -1,138 +1,101 @@
-# HR & Recruitment Contact Intelligence Platform Architecture
+# System Architecture (v2)
 
-## System Architecture Overview
-
-The HR & Recruitment Contact Intelligence Platform is built on clean, modular, domain-driven design principles with a decoupled async backend and a modern Next.js frontend.
+## Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                             Next.js 16 Web UI                               │
-│  (Dashboard | Drag & Drop Upload | Manual Grid | Live Queue | Results Grid) │
-└──────────────────────────────────────┬──────────────────────────────────────┘
-                                       │ HTTP / REST / SSE Proxy
-┌──────────────────────────────────────▼──────────────────────────────────────┐
-│                            FastAPI Backend API                              │
-│         (/health | /companies | /jobs | /results | /export)                 │
-└───────────────────┬───────────────────────────────────┬─────────────────────┘
-                    │                                   │
-┌───────────────────▼──────────────┐   ┌────────────────▼─────────────────────┐
-│     Async Pipeline Coordinator   │   │         SQLite / PostgreSQL          │
-│   (5-Step Multi-Source Pipeline) │   │        (Async SQLAlchemy 2.0)        │
-└───────────────────┬──────────────┘   └──────────────────────────────────────┘
-                    │
-   ┌────────────────┼────────────────┬────────────────┬────────────────┐
-   │                │                │                │                │
-┌──▼─────────┐ ┌────▼──────────┐ ┌───▼──────────┐ ┌───▼──────────┐ ┌───▼──────────┐
-│   Step 1   │ │    Step 2     │ │    Step 3    │ │    Step 4    │ │    Step 5    │
-│ Recursive  │ │ Public Email  │ │  LinkedIn    │ │ Public Search│ │ Verification │
-│  Crawler   │ │ Categorizer   │ │  HR Research │ │  & Indexes   │ │  & Confidence│
-│  & Sitemap │ │ (HR/Careers)  │ │ (Roles/Team) │ │ (Apollo/DDG) │ │  (DNS MX /   │
-│   Parser   │ │ (Drop Generic)│ │ (Zero Bypass)│ │ (Directories)│ │  0% to 95%)  │
-└────────────┘ └───────────────┘ └──────────────┘ └──────────────┘ └──────────────┘
+┌───────────────────────────────────────────────────────────────────────┐
+│                Next.js 16 Frontend (route groups)                     │
+│  (auth): login · register · forgot/reset · verify-email               │
+│  (app):  dashboard · new-search · searches/[id] live · results ·      │
+│          settings (providers + account)                               │
+│  ── same-origin proxy: /api/v1/* → backend (httpOnly JWT cookies) ──  │
+└───────────────────────────────────┬───────────────────────────────────┘
+                                    │
+┌───────────────────────────────────▼───────────────────────────────────┐
+│                        FastAPI Backend (/api/v1)                      │
+│                                                                       │
+│  /auth        register · login · google/oauth · captcha · verify ·    │
+│               reset (Argon2id, JWT-cookie, rate limited)              │
+│  /searches    start (form/upload) · status · logs · contacts · cancel │
+│  /contacts    global contact browser (per-user scoped)                │
+│  /companies   saved companies                                         │
+│  /providers   capability overview · encrypted key save · TEST CONN.   │
+│  /dashboard   per-user statistics                                     │
+│  /export      Excel export (evidence columns) · upload template       │
+│  /health      capabilities & config sanity                            │
+└──────┬─────────────────────────────────────────────┬──────────────────┘
+       │                                             │
+┌──────▼─────────────────┐                 ┌────────▼──────────────────┐
+│ Background worker      │                 │ Alembic-managed database  │
+│ (asyncio search jobs;  │                 │ PostgreSQL 16 (compose) / │
+│ cancellable; state in  │                 │ SQLite local fallback     │
+│ DB for progress/logs)  │                 └────────▲──────────────────┘
+└──────┬─────────────────┘                          │
+       │                                             │
+┌──────▼──────────────────────────────────────────────────────────────────┐
+│                        Search Orchestrator (per company)                │
+│                                                                         │
+│  1. Website crawl        HTTP crawler (robots.txt, sitemap, domain-     │
+│                          restricted, dedupe, redirect/error handling)   │
+│  1b. JS fallback         Playwright (optional) → Firecrawl (optional)   │
+│  2. Email extraction     mailto · visible text · obfuscation ·          │
+│                          data-email attrs · JSON-LD `email` fields      │
+│  3. Context analysis     HR classifier (local part + page type +        │
+│                          surrounding text) — generic emails never HR    │
+│  4. Person ID            JSON-LD Person · "Name – HR Title" patterns ·  │
+│                          LinkedIn URL matching                          │
+│  5. Verification         syntax → domain → MX (free) (+ Hunter/SMTP)    │
+│  7. External search      DDG (free) / Google CSE — public snippets only │
+│  8. Email discovery      Hunter.io Domain Search (real found addresses) │
+│  9. Professional data    Apollo.io people (HR titles @ the domain)      │
+│                                                                         │
+│  → evidence scoring (95+ verified, 90+ provider-verified, 70–89 strong, │
+│    <70 weak, 0 → no email shown) → persist HRContact rows → status      │
+└──────┬──────────────────────────────────────────────────────────────────┘
+       │
+┌──────▼──────────────────────────────────────────────────────────────────┐
+│                          Provider Manager                               │
+│                                                                         │
+│  ProviderRegistry (pluggable interfaces):                               │
+│      crawler    → http_crawler ★free · playwright ★free · firecrawl $   │
+│      search     → duckduckgo ★free · google_search $                    │
+│      email_finder → hunter $                                            │
+│      email_verifier → local_mx ★free · hunter $                         │
+│      people     → apollo $ (public-index snippets are free)             │
+│                                                                         │
+│  Resolution per user: DB key (encrypted) → env key → free default.      │
+│  /providers/{key}/test performs REAL API calls (latency, credits, plan).│
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Modular Directory Structure
+## Database schema
 
-```
-job_hunting/
-├── backend/
-│   ├── app/
-│   │   ├── api/
-│   │   │   ├── endpoints/
-│   │   │   │   ├── companies.py     # Upload preview, column validation, manual submission
-│   │   │   │   ├── jobs.py          # Progress polling, SSE streams, cancellations, metrics
-│   │   │   │   ├── results.py       # Querying, filtering, sorting, and pagination
-│   │   │   │   ├── export.py        # Excel (.xlsx) and CSV exports, sample templates
-│   │   │   │   └── health.py        # System health diagnostics & capabilities
-│   │   │   └── router.py            # Main API router aggregating endpoints
-│   │   ├── core/
-│   │   │   ├── config.py            # Pydantic v2 settings & environment loading
-│   │   │   ├── database.py          # Async SQLAlchemy engine, session maker, base model
-│   │   │   └── logging.py           # Structured logging with per-job live buffers
-│   │   ├── models/
-│   │   │   ├── company.py           # Company database model
-│   │   │   ├── job.py               # ExtractionJob status, timing, and counters
-│   │   │   └── result.py            # ExtractionResult with all 14 structured columns
-│   │   ├── schemas/
-│   │   │   ├── company.py           # Company input validation & preview schemas
-│   │   │   ├── job.py               # Progress, stats, and lifecycle models
-│   │   │   ├── result.py            # Result responses and filter parameters
-│   │   │   └── extraction.py        # Manual batch and single company requests
-│   │   ├── services/
-│   │   │   ├── crawler/
-│   │   │   │   ├── base.py          # BaseCrawler abstract interface
-│   │   │   │   ├── http_crawler.py  # Asynchronous HTTP crawler with priority queue
-│   │   │   │   ├── page_classifier.py # Page type scorer (careers, team, contact)
-│   │   │   │   ├── sitemap_parser.py # XML sitemap and robots.txt parser
-│   │   │   │   └── crawler_factory.py # Multi-crawler engine factory
-│   │   │   ├── extractor/
-│   │   │   │   ├── email_classifier.py # Categorizes HR, Recruitment, Careers emails
-│   │   │   │   ├── linkedin_finder.py  # Public LinkedIn profile extractor
-│   │   │   │   └── verifier.py         # RFC syntax check, DNS MX lookup, scoring
-│   │   │   ├── search/
-│   │   │   │   └── ddg_searcher.py     # Public search engine aggregator
-│   │   │   ├── excel/
-│   │   │   │   ├── importer.py      # Excel/CSV parser with fuzzy column mapping
-│   │   │   │   └── exporter.py      # Styled openpyxl Excel & CSV exporter
-│   │   │   └── pipeline/
-│   │   │       ├── coordinator.py   # Master 5-step extraction coordinator
-│   │   │       └── queue_worker.py  # Async worker manager with concurrency pools
-│   │   └── main.py                  # FastAPI lifespan & application setup
-│   ├── tests/                       # 16 unit and integration pytest test cases
-│   ├── sample_data/                 # Downloadable sample Excel and CSV files
-│   ├── Dockerfile
-│   └── requirements.txt
-├── frontend/
-│   ├── src/
-│   │   ├── app/
-│   │   │   ├── layout.tsx           # Responsive layout with Navbar and Sidebar
-│   │   │   ├── page.tsx             # Dashboard with stats & recent runs
-│   │   │   ├── upload/page.tsx      # Drag & Drop Excel/CSV upload & column validator
-│   │   │   ├── manual/page.tsx      # Manual entry spreadsheet grid
-│   │   │   ├── processing/page.tsx  # Live progress bar & streaming log terminal
-│   │   │   ├── results/page.tsx     # Data grid with sorting, filtering, copy buttons
-│   │   │   └── export/page.tsx      # Export center & sample templates
-│   │   ├── components/
-│   │   │   ├── dashboard/           # Stats cards, pipeline diagram
-│   │   │   ├── upload/              # Dropzone, preview table
-│   │   │   ├── manual/              # Manual entry spreadsheet table
-│   │   │   ├── queue/               # LiveProgressBar, LiveLogViewer
-│   │   │   ├── results/             # DataTable, ConfidenceBadge, StatusBadge, DetailModal
-│   │   │   └── layout/              # Navbar, Sidebar, ThemeToggle
-│   │   ├── lib/api.ts               # Typed client fetchers for all endpoints
-│   │   └── types/index.ts           # TypeScript domain definitions
-│   ├── package.json
-│   ├── next.config.mjs
-│   └── Dockerfile
-├── docker-compose.yml
-└── README.md
-```
+| Table | Purpose |
+|---|---|
+| `users` | email, name, Argon2 hash (null for OAuth), provider, google_sub, picture, is_email_verified, account_status, created/last_login |
+| `auth_tokens` | fingerprints of single-use verification/reset tokens |
+| `companies` | per-user: name, website, location, linkedin_url, industry, meta |
+| `searches` | per-user per-company run: status, progress %, step, counters, error, summary |
+| `search_logs` | structured progress lines (the live log stream) |
+| `hr_contacts` | evidence-backed contact: name, title, email (nullable!), linkedin, source_type + source_url + provider, verification_status, confidence, category, discovery_method |
+| `api_providers` | per-user provider config: encrypted key, masked tail, enabled, test status |
 
-## Data Collection & Verification Pipeline
+Every row carries `user_id`; every endpoint validates ownership.
 
-### Step 1: Recursive Website Crawl
-- Priority queue checks `/careers`, `/jobs`, `/hiring`, `/join-us`, `/team`, `/about-us`, `/leadership`, `/contact`, `/people`, and `/sitemap.xml`.
-- Extracts all visible text, mailto links, JSON-LD structured data (`schema.org/Person`, `schema.org/JobPosting`), and link graphs.
+## Key design decisions
 
-### Step 2: Public Email Categorization
-- Scans for all publicly visible emails.
-- Categorizes into: `HR`, `Recruitment`, `Careers`, `Talent Acquisition`, `People Operations`, `General Contact`.
-- Automatically ignores generic mailboxes (`info@`, `support@`, `admin@`, `sales@`, `contact@`, `hello@`, `marketing@`, `finance@`, `accounts@`) from HR fields, using them strictly as a fallback labeled `"General Contact Email"` only when no HR contact exists.
-
-### Step 3: Public LinkedIn Research
-- Identifies publicly available HR personnel: HR Managers, Recruiters, Talent Acquisition Specialists, Talent Partners, HR Executives, Hiring Managers, People Operations, Recruitment Coordinators.
-- Collects: Name, Job Title, LinkedIn Profile URL.
-- Strictly ethical: No login bypass or pattern guessing.
-
-### Step 4: Public Search & Directory Indexes
-- Cross-references DuckDuckGo public search, Google search index snippets, and business directories (Apollo, Wellfound, Crunchbase, Clutch).
-
-### Step 5: Verification & Confidence Scoring
-- Validates RFC 5322 email syntax and DNS MX mail exchanger records.
-- Assigns statuses:
-  - `Verified Public HR Email` (90–95%)
-  - `Verified Recruitment Email` (85–90%)
-  - `Verified Careers Email` (85–90%)
-  - `General Contact Email` (70%)
-  - `Not Publicly Available` (0%)
-- Returns `"Not Publicly Available"` whenever no verified contact exists.
+1. **Zero fabrication by construction** — there is simply no code path that
+   synthesizes an email address. `email` is a nullable column; absence of
+   evidence ⇒ no row with an email.
+2. **Confidence = evidence** — computed deterministically from
+   (where found × which verification stage passed), never from model opinion.
+3. **Graceful degradation** — provider failures log, never abort:
+   HTTP crawl → Playwright → Firecrawl; search/email-finder steps skip when
+   unconfigured; `no_results` is a *successful* honest outcome.
+4. **Progress transparency** — `search_logs` rows are written at every stage
+   and polled live by the UI (2s refresh), making debugging trivial.
+5. **JW** sessions are httpOnly cookies (CSRF-mitigation: requests must carry a
+   SameSite=Lax cookie; all browser traffic stays
+   same-origin via the Next proxy).
+6. **Rate limiting** is a sliding-window guard on auth/search endpoints;
+   swap to Redis for multi-instance deployments.

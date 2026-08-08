@@ -1,49 +1,48 @@
-"""
-FastAPI Application Entry Point.
-"""
+"""FastAPI application entry point."""
 
+import logging
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-import logging
 
+from app.api.router import api_router
 from app.core.config import settings
 from app.core.database import init_db
-from app.api.router import api_router
+from app.core.logging import logger
 
-logger = logging.getLogger("hr_extractor")
+logging.getLogger("platform").setLevel(logging.INFO)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager for database setup and cleanup."""
-    logger.info("Initializing SQLite/PostgreSQL database schema...")
+    logger.info("Initializing database schema (SQLite fallback path)...")
     await init_db()
-    logger.info("Platform database ready.")
+    logger.info("Platform ready.")
     yield
-    logger.info("Shutting down platform workers...")
+    logger.info("Shutting down.")
 
 
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="Production-Ready Public HR & Recruitment Contact Intelligence Platform",
+    description=(
+        "Evidence-first HR & recruitment contact discovery. "
+        "Never generates, guesses, or fabricates email addresses."
+    ),
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
 )
 
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 
-# Include main API router
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 
@@ -60,6 +59,5 @@ async def root():
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(
-        "app.main:app", host=settings.HOST, port=settings.PORT, reload=settings.DEBUG
-    )
+    uvicorn.run("app.main:app", host=settings.HOST, port=settings.PORT,
+                reload=settings.DEBUG)
