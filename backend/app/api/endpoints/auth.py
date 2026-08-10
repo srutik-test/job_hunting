@@ -112,7 +112,7 @@ async def register(
     user = User(
         email=email,
         name=payload.name.strip(),
-        hashed_password=hash_password(payload.password), 
+        hashed_password=hash_password(payload.password),
         auth_provider="email",
         is_email_verified=False,
         account_status="pending",

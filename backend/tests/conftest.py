@@ -98,7 +98,8 @@ async def register_and_verify(
         await db.commit()
 
     resp = await client.post(
-        "/api/v1/auth/login", json={"email": email, "password": password, "captcha": captcha_answer}
+        "/api/v1/auth/login",
+        json={"email": email, "password": password, "captcha": captcha_answer},
     )
     assert resp.status_code == 200, resp.text
     return resp.json()

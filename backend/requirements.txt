@@ -23,3 +23,4 @@ pytest>=8.2.0
 pytest-asyncio>=0.23.7
 # Optional: JavaScript rendering fallback (install separately if needed)
 # playwright>=1.44.0  # then run `playwright install chromium`
+black
