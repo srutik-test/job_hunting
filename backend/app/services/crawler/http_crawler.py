@@ -1,13 +1,18 @@
 """
 Domain-restricted asynchronous HTTP crawler.
 
-Guarantees:
+This crawler analyzes the company's website structure and relevant publicly
+available pages to find HR/recruitment contact information.
+
+CRITICAL RULES:
 * Stays on the company's own domain (and sub-domains) only.
-* Honours robots.txt when CRAWLER_RESPECT_ROBOTS is enabled.
+* Honors robots.txt when CRAWLER_RESPECT_ROBOTS is enabled.
 * Deduplicates URLs, follows redirects, caps the number of pages,
   handles common HTTP errors and never loops forever.
 * Flags JavaScript-heavy pages (result.needs_js) so the orchestrator can
   fall back to a browser-based provider.
+* Prioritizes HR-relevant pages (contact, careers, team, people, hr, etc.)
+* Extracts email addresses WITH their surrounding context for HR classification
 """
 
 import json
@@ -28,6 +33,9 @@ from app.services.crawler.page_classifier import (
 )
 from app.services.crawler.sitemap import SitemapParser
 
+# =============================================================================
+# Email extraction patterns
+# =============================================================================
 EMAIL_REGEX = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", re.I)
 OBFUSCATED = re.compile(
     r"([a-zA-Z0-9_.+-]+)\s*(?:\[at\]|\(at\)|\{at\}|\s+at\s+|\s+AT\s+)"
@@ -41,6 +49,10 @@ LINKEDIN_RE = re.compile(
     r"https?://(?:[\w.-]+\.)?linkedin\.com/(?:company|in|pub|school)/[a-zA-Z0-9_-]+/?",
     re.I,
 )
+
+# =============================================================================
+# Anti-bot detection markers
+# =============================================================================
 BLOCK_MARKERS = [
     "cf-error",
     "cf-browser-verification",
@@ -54,6 +66,31 @@ BLOCK_MARKERS = [
     "perimeterx",
 ]
 
+# =============================================================================
+# HR-relevant page paths to prioritize
+# =============================================================================
+HR_RELEVANT_PATHS = [
+    # Primary HR pages (highest priority)
+    "/contact", "/contact-us", "/contact-us.html", "/contact-us.aspx",
+    "/about", "/about-us", "/about-us.html",
+    "/careers", "/career", "/jobs", "/openings", "/vacancies",
+    "/team", "/our-team", "/leadership", "/management",
+    "/people", "/people-ops", "/people-operations",
+    "/hr", "/human-resources", "/humanresources",
+    "/recruitment", "/recruiting", "/talent",
+    "/work-with-us", "/workwithus", "/join-us", "/joinus",
+    # Secondary HR pages
+    "/about/team", "/about/leadership", "/about/people",
+    "/careers/jobs", "/careers/openings", "/jobs/apply",
+    "/company/team", "/company/about",
+    # Footer/utility pages that often have contact info
+    "/privacy", "/privacy-policy", "/legal", "/terms",
+    "/sitemap", "/sitemap.xml",
+]
+
+# =============================================================================
+# Progress callback type
+# =============================================================================
 ProgressCallback = Optional[Callable[[Dict[str, Any]], Awaitable[Optional[bool]]]]
 # callback receives {current_page, pages_crawled, emails_count}; if it returns
 # False the crawl is cancelled cooperatively.
@@ -104,19 +141,38 @@ def valid_email_candidate(email: str) -> bool:
 
 
 class HttpCrawler:
+    """
+    HTTP-based website crawler with HR focus.
+    
+    Key features:
+    1. Prioritizes HR-relevant pages
+    2. Extracts emails WITH context for proper classification
+    3. Follows internal links to discover more pages
+    4. Honors robots.txt and respects rate limits
+    5. Detects anti-bot protection
+    """
+    
     engine = "http"
+<<<<<<< HEAD
 
     def __init__(
         self,
         timeout: float = 15.0,
         max_pages: int = 30,
+=======
+    
+    def __init__(
+        self,
+        timeout: float = 15.0,
+        max_pages: int = 50,  # Increased from 30 to crawl more relevant pages
+>>>>>>> 87b2665f6d2640797abd4693bfa359426fd13709
         user_agent: Optional[str] = None,
     ):
         self.timeout = timeout
         self.max_pages = max_pages
         self.user_agent = user_agent or settings.CRAWLER_USER_AGENT
         self.sitemap = SitemapParser(timeout=10.0, user_agent=self.user_agent)
-
+    
     async def crawl_company(
         self,
         base_url: str,
@@ -128,7 +184,7 @@ class HttpCrawler:
             base_url = "https://" + base_url
         base_url = base_url.rstrip("/")
         base_domain = (urlparse(base_url).netloc or "").lower().removeprefix("www.")
-
+        
         visited: Set[str] = set()
         queue: List[tuple[int, str]] = []
         pages: List[CrawledPage] = []
@@ -139,7 +195,7 @@ class HttpCrawler:
         needs_js = False
         blocked = False
         blocked_reason = ""
-
+        
         headers = {
             "User-Agent": self.user_agent,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,*/*;q=0.8",
@@ -153,10 +209,14 @@ class HttpCrawler:
             follow_redirects=True,
             limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
         ) as client:
-            # robots.txt
+            # robots.txt check
             robots = await self._load_robots(base_url, base_domain, client)
-
+            
+            # =================================================================
+            # PRIORITY 1: Homepage (always crawl first)
+            # =================================================================
             queue.append((100, base_url))
+<<<<<<< HEAD
             for path in (
                 "/contact",
                 "/contact-us",
@@ -175,8 +235,18 @@ class HttpCrawler:
                 "/work-with-us",
                 "/join-us",
             ):
+=======
+            
+            # =================================================================
+            # PRIORITY 2: Known HR-relevant paths
+            # =================================================================
+            for path in HR_RELEVANT_PATHS:
+>>>>>>> 87b2665f6d2640797abd4693bfa359426fd13709
                 queue.append((90, urljoin(base_url, path)))
-
+            
+            # =================================================================
+            # PRIORITY 3: Sitemap URLs (filtered by relevance)
+            # =================================================================
             try:
                 sitemap_urls, sitemap_found = await self.sitemap.discover_sitemap_urls(
                     base_url, client
@@ -184,41 +254,53 @@ class HttpCrawler:
             except Exception as exc:
                 sitemap_urls, sitemap_found = [], False
                 errors.append(f"Sitemap discovery failed: {exc}")
-
+            
             for u in sitemap_urls:
                 prio = get_url_crawl_priority(u)
                 if prio > 0:
                     queue.append((prio + 20, u))
-
+            
+            # =================================================================
+            # MAIN CRAWL LOOP
+            # =================================================================
             while queue and len(pages) < self.max_pages:
+                # Sort by priority (highest first)
                 queue.sort(key=lambda x: x[0], reverse=True)
                 _, current = queue.pop(0)
+                
+                # Normalize URL
                 current, _frag = urldefrag(current)
                 current = current.rstrip("/")
+                
+                # Skip if already visited or no URL
                 if not current or current in visited:
                     continue
+                
+                # Stay on the company's domain
                 if not is_internal_url(base_domain, current):
                     continue
+                
+                # Check robots.txt
                 if robots is not None and not robots.can_fetch(
                     self.user_agent, current
                 ):
                     robots_disallowed += 1
                     continue
-
+                
                 visited.add(current)
-
+                
+                # Report progress
                 if progress_callback:
-                    keep_going = await progress_callback(
-                        {
-                            "current_page": current,
-                            "pages_crawled": len(pages),
-                            "emails_count": len(all_emails),
-                        }
-                    )
+                    keep_going = await progress_callback({
+                        "current_page": current,
+                        "pages_crawled": len(pages),
+                        "emails_count": len(all_emails),
+                    })
                     if keep_going is False:
                         errors.append("Crawl cancelled.")
                         break
-
+                
+                # Fetch the page
                 try:
                     resp = await client.get(current)
                 except httpx.TimeoutException:
@@ -227,8 +309,10 @@ class HttpCrawler:
                 except httpx.RequestError as exc:
                     errors.append(f"Fetch error on {current}: {exc.__class__.__name__}")
                     continue
-
+                
                 status = resp.status_code
+                
+                # Handle HTTP errors
                 if status in (401, 403):
                     errors.append(f"HTTP {status} (blocked) on {current}")
                     if status == 403 and not blocked:
@@ -242,7 +326,8 @@ class HttpCrawler:
                     continue
                 if status >= 400:
                     continue
-
+                
+                # Check content type
                 ctype = resp.headers.get("content-type", "").lower()
                 html = resp.text if resp.status_code else ""
                 is_html = (
@@ -256,33 +341,43 @@ class HttpCrawler:
                 )
                 if not is_html:
                     continue
+                
+                # Check for anti-bot content
                 body_lower = html[:3000].lower()
                 if not blocked and any(m in body_lower for m in BLOCK_MARKERS):
                     blocked = True
                     blocked_reason = "Anti-bot protection detected in page content."
-
+                
+                # Parse the page
                 page = self._parse_page(current, status, html, base_domain)
-
+                
                 # JS-only heuristic: tiny visible text + heavy script usage
                 if len(page.text_content) < 220 and (
                     "__NEXT_DATA__" in html
+<<<<<<< HEAD
                     or '<div id="app"></div>' in html
                     or '<div id="root"></div>' in html
+=======
+                    or "<div id=\"app\"></div>" in html
+                    or "<div id=\"root\"></div>" in html
+>>>>>>> 87b2665f6d2640797abd4693bfa359426fd13709
                     or html.count("<script") > 12
                 ):
                     needs_js = True
-
+                
                 pages.append(page)
                 all_emails.update(page.emails)
                 all_li.update(page.linkedin_urls)
-
-                # secondary internal links from the page (already-pruned)
+                
+                # =================================================================
+                # FOLLOW INTERNAL LINKS (with priority filtering)
+                # =================================================================
                 for link in page.links:
                     if link not in visited and is_internal_url(base_domain, link):
                         prio = get_url_crawl_priority(link)
                         if prio > 0:
                             queue.append((prio, link))
-
+        
         result = CrawlResult(
             base_url=base_url,
             base_domain=base_domain,
@@ -300,16 +395,31 @@ class HttpCrawler:
             engine=self.engine,
         )
         return result
+<<<<<<< HEAD
 
     # ---------------------------------------------------------------- helpers
     async def _load_robots(
         self, base_url: str, base_domain: str, client: httpx.AsyncClient
     ):
+=======
+    
+    # =================================================================
+    # Helper Methods
+    # =================================================================
+    
+    async def _load_robots(
+        self,
+        base_url: str,
+        base_domain: str,
+        client: httpx.AsyncClient,
+    ):
+        """Load and parse robots.txt."""
+>>>>>>> 87b2665f6d2640797abd4693bfa359426fd13709
         if not settings.CRAWLER_RESPECT_ROBOTS:
             return None
         try:
             from urllib.robotparser import RobotFileParser
-
+            
             resp = await client.get(f"{base_url}/robots.txt", timeout=8.0)
             if resp.status_code != 200:
                 return None
@@ -318,22 +428,39 @@ class HttpCrawler:
             return rp
         except Exception:
             return None
+<<<<<<< HEAD
 
     def _parse_page(
         self, url: str, status: int, html: str, base_domain: str
     ) -> CrawledPage:
+=======
+    
+    def _parse_page(
+        self,
+        url: str,
+        status: int,
+        html: str,
+        base_domain: str,
+    ) -> CrawledPage:
+        """Parse HTML content and extract structured data."""
+>>>>>>> 87b2665f6d2640797abd4693bfa359426fd13709
         soup = BeautifulSoup(html, "lxml") if html else None
         title, meta_desc = "", ""
         json_ld: List[Dict[str, Any]] = []
-
+        
         if soup:
+            # Extract title
             if soup.title and soup.title.string:
                 title = soup.title.string.strip()
+            
+            # Extract meta description
             desc = soup.find("meta", attrs={"name": "description"}) or soup.find(
                 "meta", attrs={"property": "og:description"}
             )
             if desc and desc.get("content"):
                 meta_desc = desc["content"].strip()
+            
+            # Extract JSON-LD structured data
             for tag in soup.find_all("script", attrs={"type": "application/ld+json"}):
                 try:
                     if tag.string:
@@ -341,20 +468,32 @@ class HttpCrawler:
                         json_ld.append(data)
                 except (ValueError, TypeError):
                     continue
-
+        
+        # Classify page type
         page_type = classify_page_type(url, title, meta_desc)
-
-        # ---- email extraction with context
+        
+        # =================================================================
+        # EMAIL EXTRACTION WITH CONTEXT (CRITICAL FOR HR CLASSIFICATION)
+        # =================================================================
         emails: Set[str] = set()
         contexts: List[Dict[str, str]] = []
-
-        # 1) mailto: links (highest signal) — capture nearby context
+        
+        # Get visible text for context extraction
+        visible_text = ""
+        if soup:
+            # Remove script, style, and noscript elements
+            for junk in soup(["script", "style", "noscript"]):
+                junk.decompose()
+            visible_text = soup.get_text(" ", strip=True)
+        
+        # 1) mailto: links (HIGHEST SIGNAL) — capture nearby context
         if soup:
             for a in soup.select('a[href^="mailto:"]'):
                 href = a.get("href", "")
                 raw = href.replace("mailto:", "").split("?")[0].strip().lower()
                 if valid_email_candidate(raw):
                     emails.add(raw)
+                    # Capture surrounding context for HR classification
                     parent_text = " ".join(
                         (
                             a.parent.get_text(" ", strip=True)
@@ -363,46 +502,48 @@ class HttpCrawler:
                         ).split()
                     )[:400]
                     contexts.append({"email": raw, "context": parent_text})
-
-        # 2) raw HTML + visible text regex (catches cfemail-free text; also manifests etc.)
-        visible_text = ""
-        if soup:
-            for junk in soup(["script", "style", "noscript"]):
-                junk.decompose()
-            visible_text = soup.get_text(" ", strip=True)
-
+        
+        # 2) Raw HTML + visible text regex
         for em in EMAIL_REGEX.findall(html):
             cleaned = em.strip().lower().rstrip(".,;:'\"")
             if valid_email_candidate(cleaned):
                 emails.add(cleaned)
-
+        
+        # 3) Obfuscated emails (cfemail style)
         for match in OBFUSCATED.finditer(visible_text):
             u, d, t = match.groups()
             cand = f"{u}@{d}.{t}".strip().lower()
             if valid_email_candidate(cand):
                 emails.add(cand)
-
-        # 3) attribute-based (data-email, obfuscation schemes)
+        
+        # 4) Attribute-based (data-email, obfuscation schemes)
         for raw in EMAIL_ATTR_REGEX.findall(html):
             cand = raw.replace("[at]", "@").replace("[dot]", ".").strip().lower()
             for em in EMAIL_REGEX.findall(cand):
                 if valid_email_candidate(em):
                     emails.add(em)
-
-        # 4) JSON-LD Person/Organization emails
+        
+        # 5) JSON-LD Person/Organization emails
         self._jsonld_emails(json_ld, emails)
-
-        # text context for emails found via raw regex (rough window)
+        
+        # Add context for emails found via raw regex
         for em in emails - {c["email"] for c in contexts}:
             idx = visible_text.lower().find(em)
             window = ""
             if idx != -1:
+<<<<<<< HEAD
                 window = visible_text[max(0, idx - 180) : idx + len(em) + 180]
+=======
+                # Get surrounding context (180 chars before and after)
+                window = visible_text[max(0, idx - 180): idx + len(em) + 180]
+>>>>>>> 87b2665f6d2640797abd4693bfa359426fd13709
             contexts.append({"email": em, "context": window})
-
-        # ---- internal links
+        
+        # =================================================================
+        # INTERNAL LINKS EXTRACTION
+        # =================================================================
         links: Set[str] = set()
-        if BeautifulSoup and soup:
+        if soup:
             for tag in soup.find_all("a", href=True):
                 href = tag["href"].strip()
                 if href.startswith(("mailto:", "tel:", "javascript:", "#")):
@@ -410,21 +551,29 @@ class HttpCrawler:
                 absolute = urljoin(url, href)
                 absolute, _f = urldefrag(absolute)
                 links.add(absolute.rstrip("/"))
-
-        # ---- LinkedIn urls
+        
+        # =================================================================
+        # LINKEDIN URLs EXTRACTION
+        # =================================================================
         linkedin: Set[str] = set()
         for m in LINKEDIN_RE.findall(html):
             clean = m.split("?")[0].rstrip("/")
             if clean:
                 linkedin.add(clean)
-
+        
         return CrawledPage(
             url=url,
             status_code=status,
             title=title,
+<<<<<<< HEAD
             text_content=visible_text[:60000],
             html_content="",
             links=list(links)[:200],
+=======
+            text_content=visible_text[:60000],  # Limit text content
+            html_content="",  # Don't store full HTML
+            links=list(links)[:200],  # Limit links
+>>>>>>> 87b2665f6d2640797abd4693bfa359426fd13709
             page_type=page_type,
             emails=sorted(emails),
             linkedin_urls=sorted(linkedin),
@@ -432,9 +581,10 @@ class HttpCrawler:
             json_ld=json_ld,
             email_contexts=contexts,
         )
-
+    
     @staticmethod
     def _jsonld_emails(data: Any, out: Set[str]) -> None:
+        """Extract emails from JSON-LD structured data."""
         if isinstance(data, dict):
             for k, v in data.items():
                 if k.lower() == "email" and isinstance(v, str):
