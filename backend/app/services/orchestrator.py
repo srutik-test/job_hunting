@@ -16,8 +16,13 @@ Runs the evidence-first discovery pipeline for one company:
         → email-finder providers (Hunter etc.)
         → final evidence-scored results
 
-An email is only ever produced when it was literally found in a source.
-Nothing is generated, pattern-guessed, or inferred.
+CRITICAL RULES:
+* An email is only ever produced when it was literally found in a source.
+* Nothing is generated, pattern-guessed, or inferred.
+* Generic emails (info@, support@, etc.) are NEVER shown as HR contacts.
+* Confidence scores represent ACTUAL evidence, not optimistic estimates.
+* If no genuine HR email is found, return "No verified HR email found."
+* Quality over quantity: it's better to return no email than a fake one.
 """
 
 import asyncio
@@ -33,7 +38,10 @@ from app.core.config import settings
 from app.models import Company, HRContact, Search, SearchLog
 from app.services.evidence import score_for_email
 from app.services.extraction.classifier import (
-    EmailCandidate, classify_email, is_hr_related,
+    EmailCandidate,
+    classify_email,
+    is_hr_related,
+    is_verified_hr_email,
 )
 from app.services.extraction.people import persons_from_jsonld, persons_from_text
 from app.services.extraction.linkedin import parse_linkedin_snippet, LinkedInLead
@@ -44,19 +52,34 @@ from app.services.providers import firecrawl as _firecrawl  # noqa: F401 (regist
 from app.services.providers import hunter as _hunter  # noqa: F401 (register)
 from app.services.providers import apollo as _apollo  # noqa: F401 (register)
 from app.services.verification.email_verifier import (
-    VerificationLevel, verify_email_local,
+    VerificationLevel,
+    verify_email_local,
 )
 
 logger = logging.getLogger("platform.orchestrator")
 
 MAX_EMAILS_TO_VERIFY = 8
 MAX_SEARCH_QUERIES = 4
-WEBSITE_RELEVANT_HINTS = ("contact", "career", "job", "people", "team",
-                          "about", "leadership", "hr", "human-resource",
-                          "recruit", "work-with", "join")
+WEBSITE_RELEVANT_HINTS = (
+    "contact", "career", "job", "people", "team",
+    "about", "leadership", "hr", "human-resource",
+    "recruit", "work-with", "join",
+)
+
+# =============================================================================
+# Generic email domains that should NEVER be treated as HR
+# =============================================================================
+GENERIC_EMAIL_PREFIXES = frozenset({
+    "info", "support", "admin", "sales", "contact", "hello", "hi", "marketing",
+    "finance", "accounts", "billing", "press", "media", "help", "enquiry",
+    "inquiry", "feedback", "service", "office", "frontdesk", "inbox", "general",
+    "webmaster", "postmaster", "security", "noreply", "no-reply", "mail",
+    "customerservice", "it", "tech", "legal", "privacy", "abuse",
+})
 
 
 def normalize_website(website: str) -> Optional[str]:
+    """Normalize website URL."""
     website = (website or "").strip()
     if not website:
         return None
@@ -69,7 +92,23 @@ def normalize_website(website: str) -> Optional[str]:
 
 
 def domain_of(url: str) -> str:
+    """Extract domain from URL."""
     return (urlparse(url).netloc or "").lower().removeprefix("www.")
+
+
+def is_generic_email(email: str) -> bool:
+    """
+    Check if an email is a generic company mailbox.
+    
+    Generic emails are NEVER HR contacts.
+    """
+    if not email or "@" not in email:
+        return False
+    local = email.split("@")[0].lower()
+    # Remove common separators
+    local_clean = local.replace(".", "").replace("-", "").replace("_", "").replace("+", "")
+    
+    return local_clean in GENERIC_EMAIL_PREFIXES or local in GENERIC_EMAIL_PREFIXES
 
 
 class SearchOrchestrator:
@@ -153,10 +192,13 @@ class SearchOrchestrator:
             if await self.check_cancelled():
                 return self.search
 
+            # =================================================================
+            # FILTER: Only include HR-related emails with sufficient evidence
+            # =================================================================
             hr_evidence = [
                 c for c in candidates
-                if is_hr_related(c) and verified_map.get(c.email) not in (
-                    VerificationLevel.INVALID, None)
+                if is_verified_hr_email(c, c.context_strength)
+                and verified_map.get(c.email) not in (VerificationLevel.INVALID, None)
             ]
 
             if not hr_evidence:
@@ -226,7 +268,7 @@ class SearchOrchestrator:
             await self.log("✓ sitemap.xml discovered and used for page prioritization")
         if crawl.robots_disallowed:
             await self.log(
-                f"robots.txt disallowed {crawl.robots_disallowed} URLs – skipped"
+                f"✓ robots.txt disallowed {crawl.robots_disallowed} URLs – skipped"
             )
         if crawl.blocked:
             await self.log(f"✕ Website blocked plain HTTP crawling: "
@@ -282,7 +324,7 @@ class SearchOrchestrator:
 
         # Report relevant pages
         for p in crawl.pages:
-            if p.page_type in ("careers", "contact", "people", "team"):
+            if p.page_type in ("careers", "contact", "people", "team", "hr", "recruitment"):
                 await self.log(f"✓ {p.page_type.capitalize()} page found: {p.url}")
         return crawl
 
@@ -304,10 +346,16 @@ class SearchOrchestrator:
         self.search.emails_found = len(result)
         await self.log(f"✓ {len(result)} email addresses extracted "
                        f"(from real page content only)")
+        
+        # Log classification summary
+        hr_count = sum(1 for c in result if is_hr_related(c))
+        generic_count = sum(1 for c in result if c.is_generic)
+        await self.log(f"   Classification: {hr_count} HR-related, {generic_count} generic company emails", "info")
+        
         for cand in result:
             label = cand.relation
             await self.log(f"   • {cand.email} → {label} (page: "
-                           f"{cand.page_type})", "info")
+                           f"{cand.page_type}, context: {cand.context_strength})", "info")
         return result
 
     # ---------------------------------------------------------------- stage 5
@@ -319,7 +367,8 @@ class SearchOrchestrator:
         verifier, verifier_key, _ = await self.provider_manager.resolve(
             "email_verifier")
         use_hunter = (
-            verifier is not None and verifier.key == "hunter" and verifier_key)
+            verifier is not None and verifier.key == "hunter" and verifier_key
+        )
 
         # Verify HR-relevant first, capped
         ordered = sorted(candidates,
@@ -403,6 +452,11 @@ class SearchOrchestrator:
                         level = await verify_email_local(em)
                         if level == VerificationLevel.INVALID:
                             continue
+                        # Skip generic emails from search results
+                        if is_generic_email(em):
+                            await self.log(
+                                f"   Skipping generic email from search: {em}", "info")
+                            continue
                         cand = classify_email(em, "general", hit.url, hit.snippet)
                         status, category, conf, _ = score_for_email(
                             cand, level, "search_provider")
@@ -461,6 +515,10 @@ class SearchOrchestrator:
                 continue
             level = await verify_email_local(fe.email)
             if level == VerificationLevel.INVALID:
+                continue
+            # Skip generic emails
+            if is_generic_email(fe.email):
+                await self.log(f"   Skipping generic email from provider: {fe.email}", "info")
                 continue
             cand = classify_email(fe.email, "general",
                                   fe.source_url or "", fe.position or "")
@@ -549,6 +607,12 @@ class SearchOrchestrator:
                 cand, level, "company_website",
                 provider_says_verified=hunter_verified.get(cand.email, False),
             )
+            # Skip if confidence is too low (less than 50%)
+            if conf < 50:
+                await self.log(
+                    f"   Skipping {cand.email}: confidence {conf}% below threshold",
+                    "warning")
+                continue
             if not await self._record_email(cand.email):
                 continue
             await self.save_contact(
@@ -597,7 +661,7 @@ class SearchOrchestrator:
         seen = set()
         for page in crawl.pages:
             if page.page_type not in ("team", "people", "leadership", "careers",
-                                      "about", "contact"):
+                                      "about", "contact", "hr", "recruitment"):
                 continue
             persons = persons_from_jsonld(page.json_ld, page.url)
             persons += persons_from_text(
@@ -698,3 +762,11 @@ class SearchOrchestrator:
             await self.db.commit()
         except Exception:
             await self.db.rollback()
+
+    # ---------------------------------------------------------------- helpers
+    @staticmethod
+    def _emails_in_text(text: str) -> List[str]:
+        """Extract email addresses from text."""
+        import re
+        EMAIL_RE = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", re.I)
+        return EMAIL_RE.findall(text)
