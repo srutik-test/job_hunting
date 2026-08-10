@@ -33,7 +33,9 @@ from app.core.config import settings
 from app.models import Company, HRContact, Search, SearchLog
 from app.services.evidence import score_for_email
 from app.services.extraction.classifier import (
-    EmailCandidate, classify_email, is_hr_related,
+    EmailCandidate,
+    classify_email,
+    is_hr_related,
 )
 from app.services.extraction.people import persons_from_jsonld, persons_from_text
 from app.services.extraction.linkedin import parse_linkedin_snippet, LinkedInLead
@@ -44,16 +46,28 @@ from app.services.providers import firecrawl as _firecrawl  # noqa: F401 (regist
 from app.services.providers import hunter as _hunter  # noqa: F401 (register)
 from app.services.providers import apollo as _apollo  # noqa: F401 (register)
 from app.services.verification.email_verifier import (
-    VerificationLevel, verify_email_local,
+    VerificationLevel,
+    verify_email_local,
 )
 
 logger = logging.getLogger("platform.orchestrator")
 
 MAX_EMAILS_TO_VERIFY = 8
 MAX_SEARCH_QUERIES = 4
-WEBSITE_RELEVANT_HINTS = ("contact", "career", "job", "people", "team",
-                          "about", "leadership", "hr", "human-resource",
-                          "recruit", "work-with", "join")
+WEBSITE_RELEVANT_HINTS = (
+    "contact",
+    "career",
+    "job",
+    "people",
+    "team",
+    "about",
+    "leadership",
+    "hr",
+    "human-resource",
+    "recruit",
+    "work-with",
+    "join",
+)
 
 
 def normalize_website(website: str) -> Optional[str]:
@@ -139,7 +153,9 @@ class SearchOrchestrator:
 
         base_url = normalize_website(self.company.website)
         if not base_url:
-            await self._finish_failed("Invalid website URL – domain could not be parsed.")
+            await self._finish_failed(
+                "Invalid website URL – domain could not be parsed."
+            )
             return self.search
         base_domain = domain_of(base_url)
 
@@ -154,15 +170,17 @@ class SearchOrchestrator:
                 return self.search
 
             hr_evidence = [
-                c for c in candidates
-                if is_hr_related(c) and verified_map.get(c.email) not in (
-                    VerificationLevel.INVALID, None)
+                c
+                for c in candidates
+                if is_hr_related(c)
+                and verified_map.get(c.email) not in (VerificationLevel.INVALID, None)
             ]
 
             if not hr_evidence:
                 await self.log(
                     "No verified HR email from the official website – continuing to "
-                    "external/LinkedIn provider steps.", "warning",
+                    "external/LinkedIn provider steps.",
+                    "warning",
                 )
                 await self._stage_external_search(base_domain)
                 await self._stage_email_finder(base_domain)
@@ -172,8 +190,9 @@ class SearchOrchestrator:
                 # persist generic company emails (real, but not HR)
                 await self._persist_company_emails(candidates, verified_map)
             else:
-                await self._persist_hr_evidence(hr_evidence, verified_map,
-                                                hunter_verified)
+                await self._persist_hr_evidence(
+                    hr_evidence, verified_map, hunter_verified
+                )
                 await self._persist_people_from_pages(crawl)
                 await self._persist_company_emails(candidates, verified_map)
 
@@ -215,7 +234,9 @@ class SearchOrchestrator:
 
         await self.log(f"Using crawler: {crawler.display_name} ({origin})")
         crawl = await crawler.crawl_company(
-            base_url, self.company.name, progress_callback=progress_cb,
+            base_url,
+            self.company.name,
+            progress_callback=progress_cb,
         )
 
         await self.log(
@@ -229,8 +250,10 @@ class SearchOrchestrator:
                 f"robots.txt disallowed {crawl.robots_disallowed} URLs – skipped"
             )
         if crawl.blocked:
-            await self.log(f"✕ Website blocked plain HTTP crawling: "
-                           f"{crawl.blocked_reason}", "warning")
+            await self.log(
+                f"✕ Website blocked plain HTTP crawling: " f"{crawl.blocked_reason}",
+                "warning",
+            )
 
         # ---- JavaScript / anti-bot fallbacks
         if crawl.pages_crawled == 0 or crawl.needs_js or crawl.blocked:
@@ -242,13 +265,15 @@ class SearchOrchestrator:
 
             # Try Playwright
             from app.services.providers.base import ProviderRegistry
+
             pw = ProviderRegistry.get("playwright")
             done = False
             if pw and pw.available():
                 await self.log("→ Falling back to browser crawler (Playwright)")
                 try:
                     fallback = await pw.crawl_company(
-                        base_url, self.company.name,
+                        base_url,
+                        self.company.name,
                         progress_callback=progress_cb,
                     )
                     if fallback.pages_crawled > 0:
@@ -266,8 +291,10 @@ class SearchOrchestrator:
                     await self.log("→ Falling back to Firecrawl crawling API")
                     try:
                         fallback = await fc.crawl_company(
-                            base_url, self.company.name,
-                            progress_callback=progress_cb, api_key=fc_key,
+                            base_url,
+                            self.company.name,
+                            progress_callback=progress_cb,
+                            api_key=fc_key,
                         )
                         if fallback.pages_crawled > 0:
                             crawl = fallback
@@ -278,7 +305,8 @@ class SearchOrchestrator:
 
             if not done and crawl.pages_crawled == 0:
                 await self.log(
-                    "✕ All crawling strategies failed for this website", "error")
+                    "✕ All crawling strategies failed for this website", "error"
+                )
 
         # Report relevant pages
         for p in crawl.pages:
@@ -294,20 +322,24 @@ class SearchOrchestrator:
             contexts = {c["email"]: c.get("context", "") for c in page.email_contexts}
             for em in page.emails:
                 best = contexts.get(em, "")
-                cand = classify_email(em, page_type=page.page_type,
-                                      source_url=page.url, context=best)
+                cand = classify_email(
+                    em, page_type=page.page_type, source_url=page.url, context=best
+                )
                 prev = candidates.get(em)
                 if prev is None or cand.context_strength > prev.context_strength:
                     candidates[em] = cand
 
         result = list(candidates.values())
         self.search.emails_found = len(result)
-        await self.log(f"✓ {len(result)} email addresses extracted "
-                       f"(from real page content only)")
+        await self.log(
+            f"✓ {len(result)} email addresses extracted "
+            f"(from real page content only)"
+        )
         for cand in result:
             label = cand.relation
-            await self.log(f"   • {cand.email} → {label} (page: "
-                           f"{cand.page_type})", "info")
+            await self.log(
+                f"   • {cand.email} → {label} (page: " f"{cand.page_type})", "info"
+            )
         return result
 
     # ---------------------------------------------------------------- stage 5
@@ -317,14 +349,14 @@ class SearchOrchestrator:
         hunter_verified: Dict[str, bool] = {}
 
         verifier, verifier_key, _ = await self.provider_manager.resolve(
-            "email_verifier")
-        use_hunter = (
-            verifier is not None and verifier.key == "hunter" and verifier_key)
+            "email_verifier"
+        )
+        use_hunter = verifier is not None and verifier.key == "hunter" and verifier_key
 
         # Verify HR-relevant first, capped
-        ordered = sorted(candidates,
-                         key=lambda c: (not is_hr_related(c),
-                                        -c.context_strength))
+        ordered = sorted(
+            candidates, key=lambda c: (not is_hr_related(c), -c.context_strength)
+        )
         for cand in ordered[:MAX_EMAILS_TO_VERIFY]:
             level = await verify_email_local(cand.email)
             verified_map[cand.email] = level
@@ -349,8 +381,7 @@ class SearchOrchestrator:
             }.get(level, "…")
             await self.log(f"   {status_line}: {cand.email}")
 
-        self.search.emails_found = max(self.search.emails_found,
-                                       len(candidates))
+        self.search.emails_found = max(self.search.emails_found, len(candidates))
         await self.db.commit()
         return verified_map, hunter_verified
 
@@ -383,18 +414,24 @@ class SearchOrchestrator:
                 if provider.key == "google_search":
                     kwargs["api_key"] = api_key
                 hits: List[SearchHit] = await provider.search(
-                    q, max_results=settings.SEARCH_MAX_RESULTS, **kwargs)
+                    q, max_results=settings.SEARCH_MAX_RESULTS, **kwargs
+                )
             except Exception as exc:
-                await self.log(f"Search provider error on query {q!r}: {exc}",
-                               "warning")
+                await self.log(
+                    f"Search provider error on query {q!r}: {exc}", "warning"
+                )
                 continue
 
             for hit in hits:
                 # LinkedIn profile snippets
                 if "linkedin.com/in/" in hit.url.lower():
                     lead = parse_linkedin_snippet(
-                        hit.title, hit.snippet, hit.url,
-                        company_name=cname, provider_name=provider.display_name)
+                        hit.title,
+                        hit.snippet,
+                        hit.url,
+                        company_name=cname,
+                        provider_name=provider.display_name,
+                    )
                     if lead:
                         linkedin_leads.append(lead)
                 # company-domain emails in snippets (real occurrences only)
@@ -405,12 +442,16 @@ class SearchOrchestrator:
                             continue
                         cand = classify_email(em, "general", hit.url, hit.snippet)
                         status, category, conf, _ = score_for_email(
-                            cand, level, "search_provider")
+                            cand, level, "search_provider"
+                        )
                         if not await self._record_email(em):
                             continue
                         await self.save_contact(
-                            email=em, name=None, designation=None,
-                            linkedin_url=None, source_type="search_provider",
+                            email=em,
+                            name=None,
+                            designation=None,
+                            linkedin_url=None,
+                            source_type="search_provider",
                             source_url=hit.url,
                             provider_name=provider.display_name,
                             verification_status=status,
@@ -420,14 +461,20 @@ class SearchOrchestrator:
                         )
                         await self.log(
                             f"✓ Email found in public index: {em} (source: "
-                            f"{hit.url})", "success")
+                            f"{hit.url})",
+                            "success",
+                        )
             await asyncio.sleep(settings.SEARCH_RATE_LIMIT_DELAY)
 
         for lead in linkedin_leads[:5]:
             await self.save_contact(
-                email=None, name=lead.name, designation=lead.job_title,
-                linkedin_url=lead.linkedin_url, source_type="linkedin_page",
-                source_url=lead.source_url, provider_name=lead.source,
+                email=None,
+                name=lead.name,
+                designation=lead.job_title,
+                linkedin_url=lead.linkedin_url,
+                source_type="linkedin_page",
+                source_url=lead.source_url,
+                provider_name=lead.source,
                 verification_status="unverified",  # no address to verify
                 confidence_score=0,
                 contact_category="linkedin",
@@ -435,14 +482,16 @@ class SearchOrchestrator:
             )
             self.search.profiles_found += 1
         if linkedin_leads:
-            await self.log(f"✓ {len(linkedin_leads)} HR LinkedIn profile(s) "
-                           f"identified via public index", "success")
+            await self.log(
+                f"✓ {len(linkedin_leads)} HR LinkedIn profile(s) "
+                f"identified via public index",
+                "success",
+            )
 
     # ---------------------------------------------------------------- stage 8
     async def _stage_email_finder(self, base_domain: str) -> None:
         await self.set_progress("Email discovery providers", 80)
-        provider, api_key, origin = await self.provider_manager.resolve(
-            "email_finder")
+        provider, api_key, origin = await self.provider_manager.resolve("email_finder")
         if provider is None:
             await self.log("No email-discovery provider configured (skipping).")
             return
@@ -462,17 +511,19 @@ class SearchOrchestrator:
             level = await verify_email_local(fe.email)
             if level == VerificationLevel.INVALID:
                 continue
-            cand = classify_email(fe.email, "general",
-                                  fe.source_url or "", fe.position or "")
+            cand = classify_email(
+                fe.email, "general", fe.source_url or "", fe.position or ""
+            )
             status, category, conf, label = score_for_email(
-                cand, level, "email_finder",
-                provider_says_verified=fe.provider_verified)
+                cand, level, "email_finder", provider_says_verified=fe.provider_verified
+            )
             # Only surface people in HR/recruiting roles (or HR mailboxes)
             title_hr = bool(
-                fe.position and any(
+                fe.position
+                and any(
                     t in fe.position.lower()
-                    for t in ("hr", "human resource", "recruit", "talent",
-                              "people")),
+                    for t in ("hr", "human resource", "recruit", "talent", "people")
+                ),
             )
             if not (is_hr_related(cand) or title_hr):
                 category = "company_email"
@@ -480,17 +531,24 @@ class SearchOrchestrator:
             if not await self._record_email(fe.email):
                 continue
             await self.save_contact(
-                email=fe.email, name=name,
-                designation=fe.position, linkedin_url=None,
-                source_type="email_finder", source_url=fe.source_url,
+                email=fe.email,
+                name=name,
+                designation=fe.position,
+                linkedin_url=None,
+                source_type="email_finder",
+                source_url=fe.source_url,
                 provider_name=provider.display_name,
-                verification_status=status, confidence_score=conf,
-                contact_category=category, discovery_method=provider.key,
+                verification_status=status,
+                confidence_score=conf,
+                contact_category=category,
+                discovery_method=provider.key,
             )
             count += 1
         if count:
-            await self.log(f"✓ {count} addresses returned by "
-                           f"{provider.display_name}", "success")
+            await self.log(
+                f"✓ {count} addresses returned by " f"{provider.display_name}",
+                "success",
+            )
         else:
             await self.log(f"{provider.display_name} returned no addresses.")
 
@@ -501,11 +559,13 @@ class SearchOrchestrator:
         if provider is None:
             await self.log("No professional-data provider configured (skipping).")
             return
-        await self.log(f"Querying {provider.display_name} for HR people at "
-                       f"{self.company.name}")
+        await self.log(
+            f"Querying {provider.display_name} for HR people at " f"{self.company.name}"
+        )
         try:
             people = await provider.find_people(
-                base_domain, company_name=self.company.name, api_key=api_key)
+                base_domain, company_name=self.company.name, api_key=api_key
+            )
         except Exception as exc:
             await self.log(f"People provider error: {exc}", "warning")
             return
@@ -515,11 +575,13 @@ class SearchOrchestrator:
             if person.email:
                 level = await verify_email_local(person.email)
                 if level != VerificationLevel.INVALID:
-                    cand = classify_email(person.email, "people",
-                                          "", person.job_title)
+                    cand = classify_email(person.email, "people", "", person.job_title)
                     status, category, conf, _ = score_for_email(
-                        cand, level, "people_provider",
-                        provider_says_verified=person.email_verified)
+                        cand,
+                        level,
+                        "people_provider",
+                        provider_says_verified=person.email_verified,
+                    )
                     if category == "company_email" and person.job_title:
                         # Strong HR title evidence from a professional DB:
                         category = "possible_hr"
@@ -528,34 +590,49 @@ class SearchOrchestrator:
             if person.email and not await self._record_email(person.email):
                 continue
             await self.save_contact(
-                email=person.email, name=person.name,
-                designation=person.job_title, linkedin_url=person.linkedin_url,
-                source_type="people_provider", source_url=person.source_url,
+                email=person.email,
+                name=person.name,
+                designation=person.job_title,
+                linkedin_url=person.linkedin_url,
+                source_type="people_provider",
+                source_url=person.source_url,
                 provider_name=provider.display_name,
-                verification_status=status, confidence_score=conf,
-                contact_category=category, discovery_method=provider.key,
+                verification_status=status,
+                confidence_score=conf,
+                contact_category=category,
+                discovery_method=provider.key,
             )
             self.search.profiles_found += 1
         if people:
-            await self.log(f"✓ {len(people)} HR profile(s) from "
-                           f"{provider.display_name}", "success")
+            await self.log(
+                f"✓ {len(people)} HR profile(s) from " f"{provider.display_name}",
+                "success",
+            )
 
     # ---------------------------------------------------------------- persist
-    async def _persist_hr_evidence(self, hr_evidence, verified_map,
-                                   hunter_verified) -> None:
+    async def _persist_hr_evidence(
+        self, hr_evidence, verified_map, hunter_verified
+    ) -> None:
         for cand in hr_evidence:
             level = verified_map.get(cand.email, VerificationLevel.SYNTAX_ONLY)
             status, category, conf, _ = score_for_email(
-                cand, level, "company_website",
+                cand,
+                level,
+                "company_website",
                 provider_says_verified=hunter_verified.get(cand.email, False),
             )
             if not await self._record_email(cand.email):
                 continue
             await self.save_contact(
-                email=cand.email, name=None, designation=None, linkedin_url=None,
-                source_type="company_website", source_url=cand.source_url,
+                email=cand.email,
+                name=None,
+                designation=None,
+                linkedin_url=None,
+                source_type="company_website",
+                source_url=cand.source_url,
                 provider_name=None,
-                verification_status=status, confidence_score=conf,
+                verification_status=status,
+                confidence_score=conf,
                 contact_category=category,
                 discovery_method="website_crawl",
             )
@@ -565,8 +642,9 @@ class SearchOrchestrator:
                 "success",
             )
 
-    async def _persist_company_emails(self, candidates, verified_map,
-                                      exclude_hr: bool = False) -> None:
+    async def _persist_company_emails(
+        self, candidates, verified_map, exclude_hr: bool = False
+    ) -> None:
         stored = 0
         for cand in candidates:
             if is_hr_related(cand):
@@ -574,35 +652,50 @@ class SearchOrchestrator:
             level = verified_map.get(cand.email)
             if level in (None, VerificationLevel.INVALID):
                 continue
-            status, category, conf, _ = score_for_email(
-                cand, level, "company_website")
+            status, category, conf, _ = score_for_email(cand, level, "company_website")
             if not await self._record_email(cand.email):
                 continue
             await self.save_contact(
-                email=cand.email, name=None, designation=None, linkedin_url=None,
-                source_type="company_website", source_url=cand.source_url,
-                provider_name=None, verification_status=status,
-                confidence_score=conf, contact_category="company_email",
+                email=cand.email,
+                name=None,
+                designation=None,
+                linkedin_url=None,
+                source_type="company_website",
+                source_url=cand.source_url,
+                provider_name=None,
+                verification_status=status,
+                confidence_score=conf,
+                contact_category="company_email",
                 discovery_method="website_crawl",
             )
             stored += 1
         if stored:
             await self.log(
                 f"✓ {stored} general company email(s) saved as company contacts "
-                f"(not HR)", "info",
+                f"(not HR)",
+                "info",
             )
 
     async def _persist_people_from_pages(self, crawl) -> None:
         stored = 0
         seen = set()
         for page in crawl.pages:
-            if page.page_type not in ("team", "people", "leadership", "careers",
-                                      "about", "contact"):
+            if page.page_type not in (
+                "team",
+                "people",
+                "leadership",
+                "careers",
+                "about",
+                "contact",
+            ):
                 continue
             persons = persons_from_jsonld(page.json_ld, page.url)
             persons += persons_from_text(
-                page.text_content, self.company.name, page.url,
-                linkedin_urls=list(crawl.all_linkedin_urls))
+                page.text_content,
+                self.company.name,
+                page.url,
+                linkedin_urls=list(crawl.all_linkedin_urls),
+            )
             for p in persons:
                 key = p.name.lower()
                 if key in seen:
@@ -614,10 +707,12 @@ class SearchOrchestrator:
                 if p.email:
                     level = await verify_email_local(p.email)
                     if level != VerificationLevel.INVALID:
-                        cand = classify_email(p.email, page.page_type, page.url,
-                                              p.job_title)
+                        cand = classify_email(
+                            p.email, page.page_type, page.url, p.job_title
+                        )
                         status, category, conf, _ = score_for_email(
-                            cand, level, "company_website")
+                            cand, level, "company_website"
+                        )
                         # An HR job title is itself HR evidence: even when the
                         # personal mailbox isn't HR-keyed, this is an HR contact
                         # (never an HR *verified* one without stronger checks).
@@ -627,10 +722,14 @@ class SearchOrchestrator:
                 if email and not await self._record_email(email):
                     continue
                 await self.save_contact(
-                    email=email, name=p.name, designation=p.job_title,
+                    email=email,
+                    name=p.name,
+                    designation=p.job_title,
                     linkedin_url=p.linkedin_profile_url,
-                    source_type="company_website", source_url=p.source_url,
-                    provider_name=None, verification_status=status,
+                    source_type="company_website",
+                    source_url=p.source_url,
+                    provider_name=None,
+                    verification_status=status,
                     confidence_score=conf,
                     contact_category=category if email else "linkedin",
                     discovery_method="website_crawl",
@@ -638,8 +737,9 @@ class SearchOrchestrator:
                 stored += 1
                 self.search.profiles_found += 1
         if stored:
-            await self.log(f"✓ {stored} HR person(s) identified on company "
-                           f"pages", "success")
+            await self.log(
+                f"✓ {stored} HR person(s) identified on company " f"pages", "success"
+            )
 
     # ---------------------------------------------------------------- status
     async def _finish_success(self) -> None:
@@ -650,32 +750,35 @@ class SearchOrchestrator:
             _select(HRContact).where(HRContact.search_id == self.search.id)
         )
         contacts = res.scalars().all()
-        hr_like = [c for c in contacts
-                   if c.contact_category in ("verified_hr", "possible_hr")]
+        hr_like = [
+            c for c in contacts if c.contact_category in ("verified_hr", "possible_hr")
+        ]
         self.search.status = "completed" if hr_like else "no_results"
         self.search.finished_at = datetime.now(timezone.utc)
         self.search.progress_pct = 100
         self.search.current_step = ""
         if hr_like:
-            best = sorted(hr_like, key=lambda c: c.confidence_score,
-                          reverse=True)[0]
+            best = sorted(hr_like, key=lambda c: c.confidence_score, reverse=True)[0]
             self.search.summary = (
                 f"{best.verification_status.replace('_', ' ').title()} HR contact: "
                 f"{best.email} (confidence {best.confidence_score}%)"
-                if best.email else "HR profile identified (no email evidence)."
+                if best.email
+                else "HR profile identified (no email evidence)."
             )
             self.search.discovery_method = best.discovery_method
             await self.log(f"✓ Final result: {self.search.summary}", "success")
         else:
-            company_emails = [c for c in contacts
-                              if c.contact_category == "company_email"]
-            linkedins = [c for c in contacts
-                         if c.contact_category == "linkedin"]
+            company_emails = [
+                c for c in contacts if c.contact_category == "company_email"
+            ]
+            linkedins = [c for c in contacts if c.contact_category == "linkedin"]
             tail = ""
             if company_emails or linkedins:
-                tail = (f" ({len(company_emails)} general company email(s), "
-                        f"{len(linkedins)} HR profile(s) without verified email "
-                        f"were found and are listed separately.)")
+                tail = (
+                    f" ({len(company_emails)} general company email(s), "
+                    f"{len(linkedins)} HR profile(s) without verified email "
+                    f"were found and are listed separately.)"
+                )
             self.search.summary = f"No verified HR contact found.{tail}"
             await self.log(f"✕ {self.search.summary}", "warning")
         await self.db.commit()
@@ -685,7 +788,8 @@ class SearchOrchestrator:
 
         try:
             res = await self.db.execute(
-                _select(Search).where(Search.id == self.search.id))
+                _select(Search).where(Search.id == self.search.id)
+            )
             self.search = res.scalars().one()
         except Exception:
             pass

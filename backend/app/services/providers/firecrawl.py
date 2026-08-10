@@ -13,7 +13,10 @@ from app.core.config import settings
 from app.services.crawler.base import CrawlResult
 from app.services.crawler.http_crawler import HttpCrawler
 from app.services.providers.base import (
-    CapabilityProvider, ProviderRegistry, TestResult, call_with_timing,
+    CapabilityProvider,
+    ProviderRegistry,
+    TestResult,
+    call_with_timing,
 )
 
 ProgressCallback = Optional[Callable[[Dict[str, Any]], Awaitable[Optional[bool]]]]
@@ -37,32 +40,45 @@ class FirecrawlProvider(CapabilityProvider):
         if not key:
             return TestResult(ok=False, message="No API key configured.")
         resp, latency, err = await call_with_timing(
-            "GET", f"{self._base}/v1/team/credit-usage",
+            "GET",
+            f"{self._base}/v1/team/credit-usage",
             headers={"Authorization": f"Bearer {key}"},
         )
         if err:
-            return TestResult(ok=False, message=f"Request failed: {err}",
-                              latency_ms=latency)
+            return TestResult(
+                ok=False, message=f"Request failed: {err}", latency_ms=latency
+            )
         assert resp is not None
         if resp.status_code == 200:
             data = resp.json().get("data", {})
             return TestResult(
-                ok=True, message="Connected to Firecrawl.",
+                ok=True,
+                message="Connected to Firecrawl.",
                 latency_ms=latency,
-                details={"remaining_credits": data.get("remaining_credits"),
-                         "plan_credits": data.get("plan_credits")},
+                details={
+                    "remaining_credits": data.get("remaining_credits"),
+                    "plan_credits": data.get("plan_credits"),
+                },
             )
         if resp.status_code in (401, 403):
-            return TestResult(ok=False,
-                              message="Invalid API key (401/403 from Firecrawl).",
-                              latency_ms=latency)
-        return TestResult(ok=False,
-                          message=f"Firecrawl returned HTTP {resp.status_code}.",
-                          latency_ms=latency)
+            return TestResult(
+                ok=False,
+                message="Invalid API key (401/403 from Firecrawl).",
+                latency_ms=latency,
+            )
+        return TestResult(
+            ok=False,
+            message=f"Firecrawl returned HTTP {resp.status_code}.",
+            latency_ms=latency,
+        )
 
-    async def crawl_company(self, base_url: str, company_name: str = "",
-                            progress_callback: ProgressCallback = None,
-                            api_key: Optional[str] = None) -> CrawlResult:
+    async def crawl_company(
+        self,
+        base_url: str,
+        company_name: str = "",
+        progress_callback: ProgressCallback = None,
+        api_key: Optional[str] = None,
+    ) -> CrawlResult:
         """Scrape the most relevant pages through Firecrawl and parse them
         locally with the shared HTTP-crawler extractor."""
         key = api_key or settings.FIRECRAWL_API_KEY
@@ -79,6 +95,7 @@ class FirecrawlProvider(CapabilityProvider):
         pages = []
         errors = list(pre.errors)
         import time as _time
+
         start = _time.time()
         all_emails = set(pre.all_emails)
         all_li = set(pre.all_linkedin_urls)
@@ -89,21 +106,25 @@ class FirecrawlProvider(CapabilityProvider):
                     break
                 if progress_callback:
                     keep = await progress_callback(
-                        {"current_page": url, "pages_crawled": len(pages),
-                         "emails_count": len(all_emails)}
+                        {
+                            "current_page": url,
+                            "pages_crawled": len(pages),
+                            "emails_count": len(all_emails),
+                        }
                     )
                     if keep is False:
                         break
                 try:
                     resp = await client.post(
                         f"{self._base}/v1/scrape",
-                        headers={"Authorization": f"Bearer {key}",
-                                 "Content-Type": "application/json"},
+                        headers={
+                            "Authorization": f"Bearer {key}",
+                            "Content-Type": "application/json",
+                        },
                         json={"url": url, "formats": ["html", "markdown"]},
                     )
                     if resp.status_code != 200:
-                        errors.append(
-                            f"Firecrawl HTTP {resp.status_code} on {url}")
+                        errors.append(f"Firecrawl HTTP {resp.status_code} on {url}")
                         continue
                     data = resp.json().get("data", {})
                     html = data.get("html") or ""

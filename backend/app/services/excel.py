@@ -21,9 +21,19 @@ from openpyxl.utils import get_column_letter
 from app.schemas.domain import CompanyInput
 
 EXPORT_HEADERS = [
-    "Company Name", "Website", "Location", "HR Name", "Designation",
-    "HR Email", "LinkedIn Profile", "Source", "Source URL",
-    "Discovery Method", "Verification Status", "Confidence", "Date Found",
+    "Company Name",
+    "Website",
+    "Location",
+    "HR Name",
+    "Designation",
+    "HR Email",
+    "LinkedIn Profile",
+    "Source",
+    "Source URL",
+    "Discovery Method",
+    "Verification Status",
+    "Confidence",
+    "Date Found",
 ]
 
 _HEADER_FILL = PatternFill("solid", fgColor="1E3A8A")
@@ -55,8 +65,7 @@ def build_results_workbook(rows: List[dict]) -> bytes:
         ws.cell(row=r, column=9, value=row.get("source_url") or "-")
         ws.cell(row=r, column=10, value=row.get("discovery_method", ""))
         ws.cell(row=r, column=11, value=row.get("verification_status", ""))
-        ws.cell(row=r, column=12,
-                value=f"{row.get('confidence_score', 0)}%")
+        ws.cell(row=r, column=12, value=f"{row.get('confidence_score', 0)}%")
         ws.cell(row=r, column=13, value=row.get("created_at", ""))
 
     for idx, header in enumerate(EXPORT_HEADERS, start=1):
@@ -74,8 +83,13 @@ _COLUMN_ALIASES = {
     "name": {"company name", "company", "organization", "organisation", "name"},
     "website": {"website", "url", "site", "domain", "company website", "web"},
     "location": {"location", "city", "address", "hq", "headquarters", "state"},
-    "linkedin_url": {"linkedin url", "linkedin", "linkedin profile",
-                     "linkedin page", "li url"},
+    "linkedin_url": {
+        "linkedin url",
+        "linkedin",
+        "linkedin profile",
+        "linkedin page",
+        "li url",
+    },
     "industry": {"industry", "sector", "vertical"},
 }
 
@@ -120,16 +134,27 @@ def parse_companies_from_file(content: bytes, filename: str) -> List[CompanyInpu
         website = str(row.get("website", "")).strip()
         if not name or name.lower() == "nan" or not website or website.lower() == "nan":
             continue
-        out.append(CompanyInput(
-            name=name[:255],
-            website=website[:1024],
-            location=(str(row.get("location", "")).strip()
-                      if str(row.get("location", "")) != "nan" else "")[:255],
-            linkedin_url=(str(row.get("linkedin_url", "")).strip()
-                          if str(row.get("linkedin_url", "")) != "nan" else "")[:1024],
-            industry=(str(row.get("industry", "")).strip()
-                      if str(row.get("industry", "")) != "nan" else "")[:255],
-        ))
+        out.append(
+            CompanyInput(
+                name=name[:255],
+                website=website[:1024],
+                location=(
+                    str(row.get("location", "")).strip()
+                    if str(row.get("location", "")) != "nan"
+                    else ""
+                )[:255],
+                linkedin_url=(
+                    str(row.get("linkedin_url", "")).strip()
+                    if str(row.get("linkedin_url", "")) != "nan"
+                    else ""
+                )[:1024],
+                industry=(
+                    str(row.get("industry", "")).strip()
+                    if str(row.get("industry", "")) != "nan"
+                    else ""
+                )[:255],
+            )
+        )
     if not out:
         raise ValueError("No valid company rows found in the uploaded file.")
     return out[:100]
@@ -145,8 +170,13 @@ def sample_template_xlsx() -> bytes:
         cell.fill = _HEADER_FILL
         cell.font = _HEADER_FONT
     samples = [
-        ("Example Software Ltd", "London", "https://example-software.co.uk",
-         "https://linkedin.com/company/example-software", "IT Services"),
+        (
+            "Example Software Ltd",
+            "London",
+            "https://example-software.co.uk",
+            "https://linkedin.com/company/example-software",
+            "IT Services",
+        ),
     ]
     for r, s in enumerate(samples, 2):
         for c, v in enumerate(s, 1):

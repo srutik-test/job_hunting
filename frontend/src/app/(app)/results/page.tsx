@@ -33,10 +33,14 @@ export default function ResultsPage() {
     setLoading(true);
     try {
       const data = await api.listContacts({
-        q, category, verification_status: verification,
+        q,
+        category,
+        verification_status: verification,
       });
       setContacts(data);
-    } catch { /* ignore */ } finally {
+    } catch {
+      /* ignore */
+    } finally {
       setLoading(false);
     }
   }, [q, category, verification]);
@@ -49,10 +53,14 @@ export default function ResultsPage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">All contacts</h1>
+        <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">
+          All contacts
+        </h1>
         {contacts.length > 0 && (
-          <a href={exportExcelUrl()}
-            className="inline-flex items-center space-x-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition">
+          <a
+            href={exportExcelUrl()}
+            className="inline-flex items-center space-x-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition"
+          >
             <Download className="h-4 w-4" />
             <span>Export to Excel</span>
           </a>
@@ -62,20 +70,33 @@ export default function ResultsPage() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[220px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <input value={q} onChange={(e) => setQ(e.target.value)}
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
             placeholder="Search company, name or email…"
-            className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 pl-9 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+            className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 pl-9 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </div>
-        <select value={category} onChange={(e) => setCategory(e.target.value)}
-          className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm">
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
+        >
           {CATEGORY_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
           ))}
         </select>
-        <select value={verification} onChange={(e) => setVerification(e.target.value)}
-          className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm">
+        <select
+          value={verification}
+          onChange={(e) => setVerification(e.target.value)}
+          className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
+        >
           {VERIFICATION_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
           ))}
         </select>
       </div>

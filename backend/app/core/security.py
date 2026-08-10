@@ -30,8 +30,12 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 # --------------------------------------------------------------------- jwt tokens
-def _create_token(subject: str, purpose: str, expires_minutes: int,
-                  extra: Optional[Dict[str, Any]] = None) -> str:
+def _create_token(
+    subject: str,
+    purpose: str,
+    expires_minutes: int,
+    extra: Optional[Dict[str, Any]] = None,
+) -> str:
     now = datetime.now(timezone.utc)
     payload: Dict[str, Any] = {
         "sub": subject,

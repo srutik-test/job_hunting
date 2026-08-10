@@ -16,11 +16,17 @@ PAGE_PATTERNS = {
         11,
     ),
     "people": (
-        re.compile(r"(human[- ]resources|people[- ](ops|operations)|talent[- ](team|acquisition)|recruiters?|hr[- ]team)", re.I),
+        re.compile(
+            r"(human[- ]resources|people[- ](ops|operations)|talent[- ](team|acquisition)|recruiters?|hr[- ]team)",
+            re.I,
+        ),
         11,
     ),
     "team": (
-        re.compile(r"(team|our[- ]team|leadership|management|executives?|who[- ]we[- ]are)", re.I),
+        re.compile(
+            r"(team|our[- ]team|leadership|management|executives?|who[- ]we[- ]are)",
+            re.I,
+        ),
         9,
     ),
     "about": (re.compile(r"(about[- ]us|about)", re.I), 7),
@@ -30,10 +36,36 @@ PAGE_PATTERNS = {
 }
 
 IGNORE_EXTENSIONS = {
-    ".pdf", ".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp", ".ico",
-    ".zip", ".tar", ".gz", ".rar", ".7z", ".exe", ".dmg", ".pkg",
-    ".mp3", ".mp4", ".wav", ".avi", ".mov", ".webm",
-    ".css", ".js", ".json", ".xml", ".woff", ".woff2", ".ttf", ".eot",
+    ".pdf",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".svg",
+    ".webp",
+    ".ico",
+    ".zip",
+    ".tar",
+    ".gz",
+    ".rar",
+    ".7z",
+    ".exe",
+    ".dmg",
+    ".pkg",
+    ".mp3",
+    ".mp4",
+    ".wav",
+    ".avi",
+    ".mov",
+    ".webm",
+    ".css",
+    ".js",
+    ".json",
+    ".xml",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".eot",
 }
 
 

@@ -7,7 +7,11 @@ import httpx
 
 from app.core.config import settings
 from app.services.providers.base import (
-    CapabilityProvider, ProviderRegistry, SearchHit, TestResult, call_with_timing,
+    CapabilityProvider,
+    ProviderRegistry,
+    SearchHit,
+    TestResult,
+    call_with_timing,
 )
 
 
@@ -23,19 +27,23 @@ class DuckDuckGoSearchProvider(CapabilityProvider):
 
     async def test_connection(self, api_key=None) -> TestResult:
         resp, latency, err = await call_with_timing(
-            "GET", "https://html.duckduckgo.com/html/?q=test",
+            "GET",
+            "https://html.duckduckgo.com/html/?q=test",
             headers={"User-Agent": settings.CRAWLER_USER_AGENT},
         )
         if err:
-            return TestResult(ok=False, message=f"DuckDuckGo unreachable: {err}",
-                              latency_ms=latency)
+            return TestResult(
+                ok=False, message=f"DuckDuckGo unreachable: {err}", latency_ms=latency
+            )
         if resp is not None and resp.status_code < 400:
-            return TestResult(ok=True, message="DuckDuckGo reachable.",
-                              latency_ms=latency)
-        return TestResult(ok=False,
-                          message=f"DuckDuckGo returned HTTP "
-                                  f"{resp.status_code if resp else '?'}",
-                          latency_ms=latency)
+            return TestResult(
+                ok=True, message="DuckDuckGo reachable.", latency_ms=latency
+            )
+        return TestResult(
+            ok=False,
+            message=f"DuckDuckGo returned HTTP " f"{resp.status_code if resp else '?'}",
+            latency_ms=latency,
+        )
 
     async def search(self, query: str, max_results: int = 8) -> list[SearchHit]:
         hits: list[SearchHit] = []
@@ -61,6 +69,7 @@ class DuckDuckGoSearchProvider(CapabilityProvider):
                 m = re.search(r"[?&]uddg=([^&]+)", url)
                 if m:
                     from urllib.parse import unquote
+
                     url = unquote(m.group(1))
                 title = a.get_text(strip=True)
                 text = snippet.get_text(" ", strip=True) if snippet else ""
@@ -93,34 +102,43 @@ class GoogleCustomSearchProvider(CapabilityProvider):
         if not key:
             return TestResult(ok=False, message="No API key configured.")
         if not cx:
-            return TestResult(ok=False,
-                              message="GOOGLE_SEARCH_ENGINE_ID is not configured.")
+            return TestResult(
+                ok=False, message="GOOGLE_SEARCH_ENGINE_ID is not configured."
+            )
         resp, latency, err = await call_with_timing(
-            "GET", "https://www.googleapis.com/customsearch/v1",
+            "GET",
+            "https://www.googleapis.com/customsearch/v1",
             params={"key": key, "cx": cx, "q": "connection test", "num": 1},
         )
         if err:
-            return TestResult(ok=False, message=f"Request failed: {err}",
-                              latency_ms=latency)
+            return TestResult(
+                ok=False, message=f"Request failed: {err}", latency_ms=latency
+            )
         assert resp is not None
         if resp.status_code == 200:
             info = resp.json().get("queries", {}).get("request", [])
-            return TestResult(ok=True, message="Connected to Google Custom Search.",
-                              latency_ms=latency,
-                              details={"results_found":
-                                       resp.json().get("searchInformation", {}).get(
-                                           "totalResults")})
+            return TestResult(
+                ok=True,
+                message="Connected to Google Custom Search.",
+                latency_ms=latency,
+                details={
+                    "results_found": resp.json()
+                    .get("searchInformation", {})
+                    .get("totalResults")
+                },
+            )
         reason = ""
         try:
             reason = resp.json().get("error", {}).get("message", "")
         except Exception:
             pass
-        return TestResult(ok=False,
-                          message=reason or f"HTTP {resp.status_code}",
-                          latency_ms=latency)
+        return TestResult(
+            ok=False, message=reason or f"HTTP {resp.status_code}", latency_ms=latency
+        )
 
-    async def search(self, query: str, max_results: int = 8,
-                     api_key: Optional[str] = None) -> list[SearchHit]:
+    async def search(
+        self, query: str, max_results: int = 8, api_key: Optional[str] = None
+    ) -> list[SearchHit]:
         key = api_key or settings.GOOGLE_SEARCH_API_KEY
         cx = settings.GOOGLE_SEARCH_ENGINE_ID
         if not key or not cx:
@@ -130,16 +148,23 @@ class GoogleCustomSearchProvider(CapabilityProvider):
             async with httpx.AsyncClient(timeout=15) as client:
                 resp = await client.get(
                     "https://www.googleapis.com/customsearch/v1",
-                    params={"key": key, "cx": cx, "q": query,
-                            "num": min(max_results, 10)},
+                    params={
+                        "key": key,
+                        "cx": cx,
+                        "q": query,
+                        "num": min(max_results, 10),
+                    },
                 )
             if resp.status_code != 200:
                 return hits
             for item in resp.json().get("items", []):
-                hits.append(SearchHit(
-                    title=item.get("title", ""), url=item.get("link", ""),
-                    snippet=item.get("snippet", ""),
-                ))
+                hits.append(
+                    SearchHit(
+                        title=item.get("title", ""),
+                        url=item.get("link", ""),
+                        snippet=item.get("snippet", ""),
+                    )
+                )
         except Exception:
             return hits
         return hits

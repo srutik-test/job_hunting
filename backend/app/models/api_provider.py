@@ -20,22 +20,29 @@ class APIProvider(Base):
     __tablename__ = "api_providers"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"),
-                     nullable=False, index=True)
+    user_id = Column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
 
     capability = Column(String(60), nullable=False)
     provider_key = Column(String(80), nullable=False)
-    api_key_encrypted = Column(Text, nullable=True)      # never serialized raw
-    api_key_masked = Column(String(30), nullable=True)   # '••••••••a1b2'
+    api_key_encrypted = Column(Text, nullable=True)  # never serialized raw
+    api_key_masked = Column(String(30), nullable=True)  # '••••••••a1b2'
     enabled = Column(Boolean, nullable=False, default=True)
     status = Column(String(30), nullable=False, default="not_tested")
     # not_tested | connected | failed | missing_key
-    status_detail = Column(String(500), nullable=True)   # e.g. 'Invalid API key'
+    status_detail = Column(String(500), nullable=True)  # e.g. 'Invalid API key'
     last_tested_at = Column(DateTime, nullable=True)
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc),
-                        onupdate=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
     user = relationship("User", back_populates="providers")
 

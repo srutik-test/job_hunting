@@ -42,9 +42,16 @@ LINKEDIN_RE = re.compile(
     re.I,
 )
 BLOCK_MARKERS = [
-    "cf-error", "cf-browser-verification", "attention required! | cloudflare",
-    "checking your browser", "just a moment", "ddos-guard", "px-captcha",
-    "akamai", "access denied | robots", "perimeterx",
+    "cf-error",
+    "cf-browser-verification",
+    "attention required! | cloudflare",
+    "checking your browser",
+    "just a moment",
+    "ddos-guard",
+    "px-captcha",
+    "akamai",
+    "access denied | robots",
+    "perimeterx",
 ]
 
 ProgressCallback = Optional[Callable[[Dict[str, Any]], Awaitable[Optional[bool]]]]
@@ -57,16 +64,38 @@ def valid_email_candidate(email: str) -> bool:
     if not email or len(email) < 6 or len(email) > 100:
         return False
     bad_endings = (
-        ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".css", ".js",
-        ".woff", ".woff2", ".ttf", ".eot", ".mp4", ".ico", ".pdf", ".html",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".svg",
+        ".webp",
+        ".css",
+        ".js",
+        ".woff",
+        ".woff2",
+        ".ttf",
+        ".eot",
+        ".mp4",
+        ".ico",
+        ".pdf",
+        ".html",
     )
     if email.endswith(bad_endings):
         return False
     parts = email.split("@")
     if len(parts) != 2 or "." not in parts[1]:
         return False
-    if parts[1] in ("example.com", "example.org", "domain.com", "email.com",
-                    "sample.com", "test.com", "sentry.io", "sentry.wixpress.com"):
+    if parts[1] in (
+        "example.com",
+        "example.org",
+        "domain.com",
+        "email.com",
+        "sample.com",
+        "test.com",
+        "sentry.io",
+        "sentry.wixpress.com",
+    ):
         return False
     # hash-like local parts on sentry noise domains
     if re.fullmatch(r"u?[0-9a-f]{5,}", parts[0]) and parts[1].endswith("sentry.io"):
@@ -77,15 +106,21 @@ def valid_email_candidate(email: str) -> bool:
 class HttpCrawler:
     engine = "http"
 
-    def __init__(self, timeout: float = 15.0, max_pages: int = 30,
-                 user_agent: Optional[str] = None):
+    def __init__(
+        self,
+        timeout: float = 15.0,
+        max_pages: int = 30,
+        user_agent: Optional[str] = None,
+    ):
         self.timeout = timeout
         self.max_pages = max_pages
         self.user_agent = user_agent or settings.CRAWLER_USER_AGENT
         self.sitemap = SitemapParser(timeout=10.0, user_agent=self.user_agent)
 
     async def crawl_company(
-        self, base_url: str, company_name: str = "",
+        self,
+        base_url: str,
+        company_name: str = "",
         progress_callback: ProgressCallback = None,
     ) -> CrawlResult:
         start = time.time()
@@ -112,7 +147,9 @@ class HttpCrawler:
         }
         transport = httpx.AsyncHTTPTransport(retries=settings.CRAWLER_MAX_RETRIES)
         async with httpx.AsyncClient(
-            transport=transport, headers=headers, timeout=self.timeout,
+            transport=transport,
+            headers=headers,
+            timeout=self.timeout,
             follow_redirects=True,
             limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
         ) as client:
@@ -121,10 +158,22 @@ class HttpCrawler:
 
             queue.append((100, base_url))
             for path in (
-                "/contact", "/contact-us", "/careers", "/career", "/jobs",
-                "/about", "/about-us", "/team", "/our-team", "/people",
-                "/leadership", "/hr", "/human-resources", "/recruitment",
-                "/work-with-us", "/join-us",
+                "/contact",
+                "/contact-us",
+                "/careers",
+                "/career",
+                "/jobs",
+                "/about",
+                "/about-us",
+                "/team",
+                "/our-team",
+                "/people",
+                "/leadership",
+                "/hr",
+                "/human-resources",
+                "/recruitment",
+                "/work-with-us",
+                "/join-us",
             ):
                 queue.append((90, urljoin(base_url, path)))
 
@@ -197,9 +246,13 @@ class HttpCrawler:
                 ctype = resp.headers.get("content-type", "").lower()
                 html = resp.text if resp.status_code else ""
                 is_html = (
-                    "text/html" in ctype or "application/xhtml" in ctype
-                    or (html.lstrip()[:15].lower().startswith(
-                        ("<!doctype html", "<html")))
+                    "text/html" in ctype
+                    or "application/xhtml" in ctype
+                    or (
+                        html.lstrip()[:15]
+                        .lower()
+                        .startswith(("<!doctype html", "<html"))
+                    )
                 )
                 if not is_html:
                     continue
@@ -211,9 +264,12 @@ class HttpCrawler:
                 page = self._parse_page(current, status, html, base_domain)
 
                 # JS-only heuristic: tiny visible text + heavy script usage
-                if len(page.text_content) < 220 and ("__NEXT_DATA__" in html or
-                    "<div id=\"app\"></div>" in html or "<div id=\"root\"></div>" in html or
-                    html.count("<script") > 12):
+                if len(page.text_content) < 220 and (
+                    "__NEXT_DATA__" in html
+                    or '<div id="app"></div>' in html
+                    or '<div id="root"></div>' in html
+                    or html.count("<script") > 12
+                ):
                     needs_js = True
 
                 pages.append(page)
@@ -246,8 +302,9 @@ class HttpCrawler:
         return result
 
     # ---------------------------------------------------------------- helpers
-    async def _load_robots(self, base_url: str, base_domain: str,
-                           client: httpx.AsyncClient):
+    async def _load_robots(
+        self, base_url: str, base_domain: str, client: httpx.AsyncClient
+    ):
         if not settings.CRAWLER_RESPECT_ROBOTS:
             return None
         try:
@@ -262,8 +319,9 @@ class HttpCrawler:
         except Exception:
             return None
 
-    def _parse_page(self, url: str, status: int, html: str,
-                    base_domain: str) -> CrawledPage:
+    def _parse_page(
+        self, url: str, status: int, html: str, base_domain: str
+    ) -> CrawledPage:
         soup = BeautifulSoup(html, "lxml") if html else None
         title, meta_desc = "", ""
         json_ld: List[Dict[str, Any]] = []
@@ -298,8 +356,11 @@ class HttpCrawler:
                 if valid_email_candidate(raw):
                     emails.add(raw)
                     parent_text = " ".join(
-                        (a.parent.get_text(" ", strip=True) if a.parent else
-                         a.get_text(" ", strip=True)).split()
+                        (
+                            a.parent.get_text(" ", strip=True)
+                            if a.parent
+                            else a.get_text(" ", strip=True)
+                        ).split()
                     )[:400]
                     contexts.append({"email": raw, "context": parent_text})
 
@@ -336,7 +397,7 @@ class HttpCrawler:
             idx = visible_text.lower().find(em)
             window = ""
             if idx != -1:
-                window = visible_text[max(0, idx - 180): idx + len(em) + 180]
+                window = visible_text[max(0, idx - 180) : idx + len(em) + 180]
             contexts.append({"email": em, "context": window})
 
         # ---- internal links
@@ -358,11 +419,17 @@ class HttpCrawler:
                 linkedin.add(clean)
 
         return CrawledPage(
-            url=url, status_code=status, title=title,
-            text_content=visible_text[:60000], html_content="",
-            links=list(links)[:200], page_type=page_type,
-            emails=sorted(emails), linkedin_urls=sorted(linkedin),
-            meta_description=meta_desc, json_ld=json_ld,
+            url=url,
+            status_code=status,
+            title=title,
+            text_content=visible_text[:60000],
+            html_content="",
+            links=list(links)[:200],
+            page_type=page_type,
+            emails=sorted(emails),
+            linkedin_urls=sorted(linkedin),
+            meta_description=meta_desc,
+            json_ld=json_ld,
             email_contexts=contexts,
         )
 

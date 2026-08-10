@@ -4,7 +4,12 @@ import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
-  ArrowLeft, Ban, Download, Loader2, Terminal, XCircle,
+  ArrowLeft,
+  Ban,
+  Download,
+  Loader2,
+  Terminal,
+  XCircle,
 } from "lucide-react";
 import { api } from "../../../../lib/api";
 import { exportExcelUrl } from "../../../../lib/api";
@@ -56,7 +61,9 @@ export default function SearchDetailPage() {
         }
       } catch (err) {
         if (!stopped)
-          setError(err instanceof Error ? err.message : "Could not load search.");
+          setError(
+            err instanceof Error ? err.message : "Could not load search.",
+          );
       }
     }
     load();
@@ -79,7 +86,9 @@ export default function SearchDetailPage() {
     try {
       const s = await api.cancelSearch(id);
       setSearch(s);
-    } catch { /* ignore */ } finally {
+    } catch {
+      /* ignore */
+    } finally {
       setCancelBusy(false);
     }
   }
@@ -105,29 +114,38 @@ export default function SearchDetailPage() {
     <div className="space-y-6 max-w-6xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center space-x-3 min-w-0">
-          <Link href="/searches"
-            className="rounded-lg border border-slate-200 dark:border-slate-700 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+          <Link
+            href="/searches"
+            className="rounded-lg border border-slate-200 dark:border-slate-700 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+          >
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div className="min-w-0">
             <h1 className="text-xl font-extrabold text-slate-900 dark:text-white truncate">
               {search.company?.name}
             </h1>
-            <p className="text-xs text-slate-400 truncate">{search.company?.website}</p>
+            <p className="text-xs text-slate-400 truncate">
+              {search.company?.website}
+            </p>
           </div>
           <StatusChip status={search.status} />
         </div>
         <div className="flex items-center space-x-2">
           {running && (
-            <button onClick={cancel} disabled={cancelBusy}
-              className="inline-flex items-center space-x-1.5 rounded-lg border border-red-300 dark:border-red-800 px-3 py-1.5 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition disabled:opacity-60">
+            <button
+              onClick={cancel}
+              disabled={cancelBusy}
+              className="inline-flex items-center space-x-1.5 rounded-lg border border-red-300 dark:border-red-800 px-3 py-1.5 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition disabled:opacity-60"
+            >
               <Ban className="h-3.5 w-3.5" />
               <span>{cancelBusy ? "Cancelling…" : "Cancel"}</span>
             </button>
           )}
           {finished && contacts.length > 0 && (
-            <a href={exportExcelUrl(search.id)}
-              className="inline-flex items-center space-x-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 transition">
+            <a
+              href={exportExcelUrl(search.id)}
+              className="inline-flex items-center space-x-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 transition"
+            >
               <Download className="h-3.5 w-3.5" />
               <span>Export Excel</span>
             </a>
@@ -138,12 +156,16 @@ export default function SearchDetailPage() {
       {running && (
         <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 space-y-2 shadow-sm">
           <div className="flex justify-between text-xs font-semibold text-slate-500">
-            <span className="truncate">{search.current_step || "Starting…"}</span>
+            <span className="truncate">
+              {search.current_step || "Starting…"}
+            </span>
             <span>{search.progress_pct}%</span>
           </div>
           <div className="h-2 w-full rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-            <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-500"
-              style={{ width: `${search.progress_pct}%` }} />
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-500"
+              style={{ width: `${search.progress_pct}%` }}
+            />
           </div>
           <div className="flex space-x-4 text-[11px] text-slate-400">
             <span>{search.pages_crawled} pages crawled</span>
@@ -161,12 +183,14 @@ export default function SearchDetailPage() {
       )}
 
       {search.summary && finished && (
-        <div className={clsx(
-          "rounded-xl border p-4 text-sm font-semibold",
-          search.status === "completed"
-            ? "border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
-            : "border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-300",
-        )}>
+        <div
+          className={clsx(
+            "rounded-xl border p-4 text-sm font-semibold",
+            search.status === "completed"
+              ? "border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
+              : "border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-300",
+          )}
+        >
           {search.summary}
         </div>
       )}
@@ -177,19 +201,27 @@ export default function SearchDetailPage() {
           <Terminal className="h-4 w-4 text-blue-400" />
           <span>Progress log</span>
         </div>
-        <div ref={logRef} className="max-h-72 overflow-y-auto rounded-lg bg-black/40 p-3 font-mono text-[11px] leading-5 space-y-0.5">
-          {logs.length === 0 && <p className="text-slate-500">Waiting for the worker to start…</p>}
+        <div
+          ref={logRef}
+          className="max-h-72 overflow-y-auto rounded-lg bg-black/40 p-3 font-mono text-[11px] leading-5 space-y-0.5"
+        >
+          {logs.length === 0 && (
+            <p className="text-slate-500">Waiting for the worker to start…</p>
+          )}
           {logs.map((log) => (
-            <p key={log.id} className={LOG_ICONS[log.level] || "text-slate-400"}>
+            <p
+              key={log.id}
+              className={LOG_ICONS[log.level] || "text-slate-400"}
+            >
               <span className="text-slate-600 mr-2">
-                {log.created_at ? new Date(log.created_at).toLocaleTimeString() : ""}
+                {log.created_at
+                  ? new Date(log.created_at).toLocaleTimeString()
+                  : ""}
               </span>
               {log.message}
             </p>
           ))}
-          {running && (
-            <p className="text-blue-400 animate-pulse">▍</p>
-          )}
+          {running && <p className="text-blue-400 animate-pulse">▍</p>}
         </div>
       </div>
 

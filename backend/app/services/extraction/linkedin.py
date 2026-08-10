@@ -18,7 +18,7 @@ class LinkedInLead(BaseModel):
     name: str
     job_title: str
     linkedin_url: str
-    source: str                        # e.g. 'DuckDuckGo public index snippet'
+    source: str  # e.g. 'DuckDuckGo public index snippet'
     source_url: str
 
 
@@ -27,8 +27,14 @@ def _valid_name(name: str, company_name: str) -> bool:
         return False
     low = name.lower()
     blacklist = {
-        "about us", "contact us", "our team", "view profile", "apply now",
-        "read more", "learn more", "linkedin profile",
+        "about us",
+        "contact us",
+        "our team",
+        "view profile",
+        "apply now",
+        "read more",
+        "learn more",
+        "linkedin profile",
     }
     if low in blacklist:
         return False
@@ -37,8 +43,9 @@ def _valid_name(name: str, company_name: str) -> bool:
     return 2 <= len(name.split()) <= 4
 
 
-def parse_linkedin_snippet(title: str, snippet: str, url: str,
-                           company_name: str, provider_name: str) -> Optional[LinkedInLead]:
+def parse_linkedin_snippet(
+    title: str, snippet: str, url: str, company_name: str, provider_name: str
+) -> Optional[LinkedInLead]:
     """
     Parse a public search result like:
       title:   'Jane Doe - Talent Acquisition Manager - Acme Corp | LinkedIn'

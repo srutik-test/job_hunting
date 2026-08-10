@@ -14,7 +14,11 @@ import httpx
 
 from app.core.config import settings
 from app.services.providers.base import (
-    CapabilityProvider, FoundEmail, ProviderRegistry, TestResult, call_with_timing,
+    CapabilityProvider,
+    FoundEmail,
+    ProviderRegistry,
+    TestResult,
+    call_with_timing,
 )
 
 
@@ -32,18 +36,22 @@ class HunterProvider(CapabilityProvider):
         if not key:
             return TestResult(ok=False, message="No API key configured.")
         resp, latency, err = await call_with_timing(
-            "GET", "https://api.hunter.io/v2/account", params={"api_key": key},
+            "GET",
+            "https://api.hunter.io/v2/account",
+            params={"api_key": key},
         )
         if err:
-            return TestResult(ok=False, message=f"Request failed: {err}",
-                              latency_ms=latency)
+            return TestResult(
+                ok=False, message=f"Request failed: {err}", latency_ms=latency
+            )
         assert resp is not None
         if resp.status_code == 200:
             data = resp.json().get("data", {})
             requests = data.get("requests", {})
             searches = requests.get("searches", {})
             return TestResult(
-                ok=True, message="Connected to Hunter.io.",
+                ok=True,
+                message="Connected to Hunter.io.",
                 latency_ms=latency,
                 details={
                     "plan": data.get("plan_name"),
@@ -52,14 +60,18 @@ class HunterProvider(CapabilityProvider):
                 },
             )
         if resp.status_code in (401, 403):
-            return TestResult(ok=False, message="Invalid Hunter API key.",
-                              latency_ms=latency)
-        return TestResult(ok=False,
-                          message=f"Hunter returned HTTP {resp.status_code}.",
-                          latency_ms=latency)
+            return TestResult(
+                ok=False, message="Invalid Hunter API key.", latency_ms=latency
+            )
+        return TestResult(
+            ok=False,
+            message=f"Hunter returned HTTP {resp.status_code}.",
+            latency_ms=latency,
+        )
 
-    async def find_emails(self, domain: str, limit: int = 10,
-                          api_key: Optional[str] = None) -> List[FoundEmail]:
+    async def find_emails(
+        self, domain: str, limit: int = 10, api_key: Optional[str] = None
+    ) -> List[FoundEmail]:
         key = api_key or settings.HUNTER_API_KEY
         if not key or not domain:
             return []
@@ -75,15 +87,17 @@ class HunterProvider(CapabilityProvider):
             for em in resp.json().get("data", {}).get("emails", []):
                 sources = em.get("sources", [])
                 verified = em.get("verification", {}).get("status") == "valid"
-                out.append(FoundEmail(
-                    email=(em.get("value") or "").lower().strip(),
-                    first_name=em.get("first_name"),
-                    last_name=em.get("last_name"),
-                    position=em.get("position"),
-                    source_url=sources[0].get("uri") if sources else None,
-                    provider_verified=verified,
-                    provider_score=em.get("confidence"),
-                ))
+                out.append(
+                    FoundEmail(
+                        email=(em.get("value") or "").lower().strip(),
+                        first_name=em.get("first_name"),
+                        last_name=em.get("last_name"),
+                        position=em.get("position"),
+                        source_url=sources[0].get("uri") if sources else None,
+                        provider_verified=verified,
+                        provider_score=em.get("confidence"),
+                    )
+                )
             return out
         except Exception:
             return []
@@ -102,7 +116,7 @@ class HunterProvider(CapabilityProvider):
                 return {"status": "unknown"}
             data = resp.json().get("data", {})
             return {
-                "status": data.get("status", "unknown"),   # valid|invalid|accept_all|...
+                "status": data.get("status", "unknown"),  # valid|invalid|accept_all|...
                 "score": data.get("score"),
                 "mx_records": data.get("mx_records"),
                 "smtp_check": data.get("smtp_check"),

@@ -49,7 +49,9 @@ class SlidingWindowRateLimiter:
             # opportunistic cleanup
             if len(self._hits) > 10_000:
                 cutoff = now - window
-                self._hits = {k: v for k, v in self._hits.items() if v and v[-1] > cutoff}
+                self._hits = {
+                    k: v for k, v in self._hits.items() if v and v[-1] > cutoff
+                }
 
 
 _limiter = SlidingWindowRateLimiter()

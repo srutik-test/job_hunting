@@ -36,9 +36,11 @@ def captcha_config() -> dict:
     """Configuration surfaced to the frontend."""
     return {
         "provider": settings.CAPTCHA_PROVIDER,
-        "site_key": settings.CAPTCHA_SITE_KEY
-        if settings.CAPTCHA_PROVIDER in ("turnstile", "recaptcha", "hcaptcha")
-        else None,
+        "site_key": (
+            settings.CAPTCHA_SITE_KEY
+            if settings.CAPTCHA_PROVIDER in ("turnstile", "recaptcha", "hcaptcha")
+            else None
+        ),
     }
 
 

@@ -25,7 +25,9 @@ async def _send(to: str, subject: str, html: str) -> bool:
     if not smtp_configured():
         logger.info(
             "SMTP not configured. Email to %s with subject %r was written to the log:\n%s",
-            to, subject, html,
+            to,
+            subject,
+            html,
         )
         return False
 

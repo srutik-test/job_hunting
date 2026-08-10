@@ -18,10 +18,18 @@ class Search(Base):
     __tablename__ = "searches"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"),
-                     nullable=False, index=True)
-    company_id = Column(String(36), ForeignKey("companies.id", ondelete="CASCADE"),
-                        nullable=False, index=True)
+    user_id = Column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    company_id = Column(
+        String(36),
+        ForeignKey("companies.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
 
     status = Column(String(50), nullable=False, default="pending", index=True)
     # pending | processing | completed | no_results | failed
@@ -34,20 +42,25 @@ class Search(Base):
     duration_seconds = Column(Float, default=0.0)
 
     error_message = Column(Text, nullable=True)
-    summary = Column(Text, nullable=True)          # final 'no verified…' style message
-    discovery_method = Column(String(80), nullable=True)  # website | provider | linkedin | mixed
+    summary = Column(Text, nullable=True)  # final 'no verified…' style message
+    discovery_method = Column(
+        String(80), nullable=True
+    )  # website | provider | linkedin | mixed
 
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc),
-                        index=True)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), index=True
+    )
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
 
     user = relationship("User", back_populates="searches")
     company = relationship("Company", back_populates="searches")
-    contacts = relationship("HRContact", back_populates="search",
-                            cascade="all, delete-orphan")
-    logs = relationship("SearchLog", back_populates="search",
-                        cascade="all, delete-orphan")
+    contacts = relationship(
+        "HRContact", back_populates="search", cascade="all, delete-orphan"
+    )
+    logs = relationship(
+        "SearchLog", back_populates="search", cascade="all, delete-orphan"
+    )
 
     def to_dict(self) -> dict:
         return {
@@ -76,12 +89,19 @@ class SearchLog(Base):
     __tablename__ = "search_logs"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    search_id = Column(String(36), ForeignKey("searches.id", ondelete="CASCADE"),
-                       nullable=False, index=True)
-    level = Column(String(20), nullable=False, default="info")  # info | success | warning | error
+    search_id = Column(
+        String(36),
+        ForeignKey("searches.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    level = Column(
+        String(20), nullable=False, default="info"
+    )  # info | success | warning | error
     message = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc),
-                        index=True)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), index=True
+    )
 
     search = relationship("Search", back_populates="logs")
 

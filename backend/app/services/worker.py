@@ -60,7 +60,8 @@ class SearchWorker:
                 logger.error("Worker: search %s not found", search_id)
                 return
             res = await db.execute(
-                select(Company).where(Company.id == search.company_id))
+                select(Company).where(Company.id == search.company_id)
+            )
             company = res.scalars().first()
             if company is None:
                 logger.error("Worker: company %s not found", search.company_id)
@@ -72,6 +73,7 @@ class SearchWorker:
             except asyncio.CancelledError:
                 logger.info("Search %s cancelled", search_id)
                 from sqlalchemy import select as _s
+
                 try:
                     db.add  # noqa
                     res = await db.execute(_s(Search).where(Search.id == search_id))

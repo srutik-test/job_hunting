@@ -22,7 +22,9 @@ export default function AuthCard({
           {title}
         </h1>
         {subtitle && (
-          <p className="text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {subtitle}
+          </p>
         )}
       </div>
 

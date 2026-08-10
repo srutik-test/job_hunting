@@ -13,7 +13,6 @@ from httpx import MockTransport, Response
 from app.services.crawler.base import CrawlResult
 from tests.conftest import register_and_verify
 
-
 CONTACT_HTML = b"""
 <html><head><title>Contact - BetaWorks Careers</title></head><body>
 <p>For recruitment enquiries email <a href="mailto:hr@betaworks.io">hr@betaworks.io</a>
@@ -37,7 +36,8 @@ async def test_orchestrator_finds_real_hr_email(client, monkeypatch):
 
     crawler = HttpCrawler()
     page = crawler._parse_page(
-        "https://betaworks.io/contact", 200, CONTACT_HTML.decode(), "betaworks.io")
+        "https://betaworks.io/contact", 200, CONTACT_HTML.decode(), "betaworks.io"
+    )
 
     class FakeCrawler(CapabilityProvider):
         key = "fake_crawl"
@@ -49,29 +49,36 @@ async def test_orchestrator_finds_real_hr_email(client, monkeypatch):
         async def test_connection(self, api_key=None):
             return TestResult(ok=True, message="fake ok")
 
-        async def crawl_company(self, base_url, company_name="",
-                                progress_callback=None):
+        async def crawl_company(
+            self, base_url, company_name="", progress_callback=None
+        ):
             return CrawlResult(
-                base_url="https://betaworks.io", base_domain="betaworks.io",
-                pages=[page], pages_crawled=1,
-                all_emails=set(page.emails), duration_seconds=0.1,
+                base_url="https://betaworks.io",
+                base_domain="betaworks.io",
+                pages=[page],
+                pages_crawled=1,
+                all_emails=set(page.emails),
+                duration_seconds=0.1,
                 engine="fake",
             )
 
     async def fake_verify(email):
         from app.services.verification.email_verifier import VerificationLevel
+
         return VerificationLevel.MX_OK
 
     from app.services.providers.base import ProviderRegistry
 
     monkeypatch.setitem(ProviderRegistry._providers, "http_crawler", FakeCrawler())
-    monkeypatch.setattr(
-        "app.services.orchestrator.verify_email_local", fake_verify)
+    monkeypatch.setattr("app.services.orchestrator.verify_email_local", fake_verify)
 
     await register_and_verify(client[0], client[1])
-    resp = await client[0].post("/api/v1/searches", json={
-        "companies": [{"name": "BetaWorks", "website": "https://betaworks.io"}],
-    })
+    resp = await client[0].post(
+        "/api/v1/searches",
+        json={
+            "companies": [{"name": "BetaWorks", "website": "https://betaworks.io"}],
+        },
+    )
     assert resp.status_code == 201, resp.text
     search_id = resp.json()[0]["id"]
 
@@ -86,8 +93,7 @@ async def test_orchestrator_finds_real_hr_email(client, monkeypatch):
     data = res.json()
     assert data["status"] == "completed", data.get("error_message")
 
-    contacts = (await client[0].get(
-        f"/api/v1/searches/{search_id}/contacts")).json()
+    contacts = (await client[0].get(f"/api/v1/searches/{search_id}/contacts")).json()
     emails = {c["email"]: c for c in contacts}
 
     # Real HR mailbox surfaced with evidence + source
@@ -113,7 +119,11 @@ async def test_orchestrator_finds_real_hr_email(client, monkeypatch):
 @pytest.mark.asyncio
 async def test_orchestrator_returns_no_results_when_site_has_no_hr(client, monkeypatch):
     from app.services.crawler.http_crawler import HttpCrawler
-    from app.services.providers.base import CapabilityProvider, TestResult, ProviderRegistry
+    from app.services.providers.base import (
+        CapabilityProvider,
+        TestResult,
+        ProviderRegistry,
+    )
     from app.services.verification.email_verifier import VerificationLevel
 
     html = """
@@ -134,11 +144,15 @@ async def test_orchestrator_returns_no_results_when_site_has_no_hr(client, monke
         async def test_connection(self, api_key=None):
             return TestResult(ok=True)
 
-        async def crawl_company(self, base_url, company_name="",
-                                progress_callback=None):
+        async def crawl_company(
+            self, base_url, company_name="", progress_callback=None
+        ):
             return CrawlResult(
-                base_url="https://gammaco.io", base_domain="gammaco.io",
-                pages=[page], pages_crawled=1, all_emails=set(page.emails),
+                base_url="https://gammaco.io",
+                base_domain="gammaco.io",
+                pages=[page],
+                pages_crawled=1,
+                all_emails=set(page.emails),
                 engine="fake",
             )
 
@@ -146,13 +160,15 @@ async def test_orchestrator_returns_no_results_when_site_has_no_hr(client, monke
         return VerificationLevel.MX_OK
 
     monkeypatch.setitem(ProviderRegistry._providers, "http_crawler", FakeCrawler())
-    monkeypatch.setattr(
-        "app.services.orchestrator.verify_email_local", fake_verify)
+    monkeypatch.setattr("app.services.orchestrator.verify_email_local", fake_verify)
 
     await register_and_verify(client[0], client[1], email="g@example.com")
-    resp = await client[0].post("/api/v1/searches", json={
-        "companies": [{"name": "GammaCo", "website": "https://gammaco.io"}],
-    })
+    resp = await client[0].post(
+        "/api/v1/searches",
+        json={
+            "companies": [{"name": "GammaCo", "website": "https://gammaco.io"}],
+        },
+    )
     search_id = resp.json()[0]["id"]
 
     for _ in range(60):
@@ -164,8 +180,7 @@ async def test_orchestrator_returns_no_results_when_site_has_no_hr(client, monke
     assert res.json()["status"] == "no_results"
     assert "No verified HR contact found" in res.json()["summary"]
 
-    contacts = (await client[0].get(
-        f"/api/v1/searches/{search_id}/contacts")).json()
+    contacts = (await client[0].get(f"/api/v1/searches/{search_id}/contacts")).json()
     # a generic mailbox may appear, but never as HR.
     for c in contacts:
         assert c["contact_category"] == "company_email"

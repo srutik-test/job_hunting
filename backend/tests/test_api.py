@@ -10,9 +10,12 @@ async def test_data_isolation_between_users(client):
     ac, Session = client
     await register_and_verify(ac, Session, email="one@example.com")
 
-    resp = await ac.post("/api/v1/searches", json={
-        "companies": [{"name": "Isol Corp", "website": "https://isol.example.com"}],
-    })
+    resp = await ac.post(
+        "/api/v1/searches",
+        json={
+            "companies": [{"name": "Isol Corp", "website": "https://isol.example.com"}],
+        },
+    )
     assert resp.status_code == 201
     search_id = resp.json()[0]["id"]
 
@@ -33,8 +36,13 @@ async def test_dashboard_stats_shape(client):
     resp = await ac.get("/api/v1/dashboard")
     assert resp.status_code == 200
     data = resp.json()
-    for key in ("total_companies", "total_searches", "verified_contacts",
-                "searches_failed", "linkedin_profiles"):
+    for key in (
+        "total_companies",
+        "total_searches",
+        "verified_contacts",
+        "searches_failed",
+        "linkedin_profiles",
+    ):
         assert key in data
 
 
@@ -42,9 +50,12 @@ async def test_dashboard_stats_shape(client):
 async def test_invalid_website_rejected(client):
     ac, Session = client
     await register_and_verify(ac, Session)
-    resp = await ac.post("/api/v1/searches", json={
-        "companies": [{"name": "Broken", "website": "::::"}],
-    })
+    resp = await ac.post(
+        "/api/v1/searches",
+        json={
+            "companies": [{"name": "Broken", "website": "::::"}],
+        },
+    )
     assert resp.status_code == 422
 
 

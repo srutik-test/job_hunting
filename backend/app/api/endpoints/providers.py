@@ -18,7 +18,8 @@ from app.core.deps import get_current_user
 from app.models import APIProvider, User
 from app.schemas.domain import ProviderResponse, ProviderTestResponse
 from app.services.providers.base import (
-    ProviderManager, ProviderRegistry,
+    ProviderManager,
+    ProviderRegistry,
 )
 from app.services.providers import builtin as _builtin  # noqa: F401 - register
 from app.services.providers import search as _search  # noqa: F401
@@ -32,14 +33,18 @@ CAPABILITIES = ["crawler", "search", "email_finder", "email_verifier", "people"]
 
 
 async def _user_row(db: AsyncSession, user_id: str, key: str) -> Optional[APIProvider]:
-    res = await db.execute(select(APIProvider).where(
-        APIProvider.user_id == user_id, APIProvider.provider_key == key))
+    res = await db.execute(
+        select(APIProvider).where(
+            APIProvider.user_id == user_id, APIProvider.provider_key == key
+        )
+    )
     return res.scalars().first()
 
 
 @router.get("", response_model=list[ProviderResponse])
-async def list_providers(user: User = Depends(get_current_user),
-                         db: AsyncSession = Depends(get_db)):
+async def list_providers(
+    user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
     manager = ProviderManager(db, user.id)
     out: list[ProviderResponse] = []
     for capability in CAPABILITIES:
@@ -47,48 +52,77 @@ async def list_providers(user: User = Depends(get_current_user),
         for provider in ProviderRegistry.for_capability(capability):
             row = await _user_row(db, user.id, provider.key)
             configured_env = provider.configured_via_env()
-            enabled = row.enabled if row else bool(
-                configured_env or not provider.requires_api_key)
-            status = row.status if row else (
-                "connected" if configured_env else
-                ("not_tested" if not provider.requires_api_key else "missing_key"))
-            out.append(ProviderResponse(
-                id=row.id if row else None,
-                capability=capability,
-                provider_key=provider.key,
-                display_name=provider.display_name,
-                is_free=provider.is_free,
-                configured_via_env=configured_env,
-                api_key_masked=row.api_key_masked if row else None,
-                has_api_key=bool(row and row.api_key_encrypted) or configured_env,
-                enabled=enabled,
-                status=status,
-                status_detail=row.status_detail if row else (
-                    "Configured via environment variable" if configured_env else None),
-                last_tested_at=(row.last_tested_at.isoformat()
-                                if row and row.last_tested_at else None),
-                signup_url=provider.signup_url,
-            ))
+            enabled = (
+                row.enabled
+                if row
+                else bool(configured_env or not provider.requires_api_key)
+            )
+            status = (
+                row.status
+                if row
+                else (
+                    "connected"
+                    if configured_env
+                    else (
+                        "not_tested" if not provider.requires_api_key else "missing_key"
+                    )
+                )
+            )
+            out.append(
+                ProviderResponse(
+                    id=row.id if row else None,
+                    capability=capability,
+                    provider_key=provider.key,
+                    display_name=provider.display_name,
+                    is_free=provider.is_free,
+                    configured_via_env=configured_env,
+                    api_key_masked=row.api_key_masked if row else None,
+                    has_api_key=bool(row and row.api_key_encrypted) or configured_env,
+                    enabled=enabled,
+                    status=status,
+                    status_detail=(
+                        row.status_detail
+                        if row
+                        else (
+                            "Configured via environment variable"
+                            if configured_env
+                            else None
+                        )
+                    ),
+                    last_tested_at=(
+                        row.last_tested_at.isoformat()
+                        if row and row.last_tested_at
+                        else None
+                    ),
+                    signup_url=provider.signup_url,
+                )
+            )
     return out
 
 
 class ProviderUpsert(BaseModel):
-    api_key: Optional[str] = None      # 'CLEAR' clears the stored key; None keeps it
+    api_key: Optional[str] = None  # 'CLEAR' clears the stored key; None keeps it
     enabled: Optional[bool] = None
 
 
 @router.put("/{provider_key}", response_model=ProviderResponse)
-async def upsert_provider(provider_key: str, payload: ProviderUpsert,
-                          user: User = Depends(get_current_user),
-                          db: AsyncSession = Depends(get_db)):
+async def upsert_provider(
+    provider_key: str,
+    payload: ProviderUpsert,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     provider = ProviderRegistry.get(provider_key)
     if provider is None:
         raise HTTPException(status_code=404, detail="Unknown provider.")
 
     row = await _user_row(db, user.id, provider_key)
     if row is None:
-        row = APIProvider(user_id=user.id, capability=provider.capabilities[0],
-                          provider_key=provider_key)
+        row = APIProvider(
+            user_id=user.id,
+            capability=provider.capabilities[0],
+            provider_key=provider_key,
+        )
         db.add(row)
         await db.flush()
 
@@ -110,16 +144,18 @@ async def upsert_provider(provider_key: str, payload: ProviderUpsert,
     await db.commit()
 
     return ProviderResponse(
-        id=row.id, capability=provider.capabilities[0],
-        provider_key=provider.key, display_name=provider.display_name,
+        id=row.id,
+        capability=provider.capabilities[0],
+        provider_key=provider.key,
+        display_name=provider.display_name,
         is_free=provider.is_free,
         configured_via_env=provider.configured_via_env(),
         api_key_masked=row.api_key_masked,
         has_api_key=bool(row.api_key_encrypted) or provider.configured_via_env(),
-        enabled=row.enabled, status=row.status,
+        enabled=row.enabled,
+        status=row.status,
         status_detail=row.status_detail,
-        last_tested_at=(row.last_tested_at.isoformat()
-                        if row.last_tested_at else None),
+        last_tested_at=(row.last_tested_at.isoformat() if row.last_tested_at else None),
         signup_url=provider.signup_url,
     )
 
@@ -129,9 +165,12 @@ class TestRequest(BaseModel):
 
 
 @router.post("/{provider_key}/test", response_model=ProviderTestResponse)
-async def test_provider(provider_key: str, payload: TestRequest,
-                        user: User = Depends(get_current_user),
-                        db: AsyncSession = Depends(get_db)):
+async def test_provider(
+    provider_key: str,
+    payload: TestRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     provider = ProviderRegistry.get(provider_key)
     if provider is None:
         raise HTTPException(status_code=404, detail="Unknown provider.")
@@ -143,15 +182,19 @@ async def test_provider(provider_key: str, payload: TestRequest,
 
     if provider.requires_api_key and not api_key:
         return ProviderTestResponse(
-            ok=False, provider_key=provider_key,
+            ok=False,
+            provider_key=provider_key,
             message="No API key provided, stored, or configured via environment.",
         )
 
     try:
         result = await provider.test_connection(api_key)
     except Exception as exc:  # defensive: test must never crash the API
-        return ProviderTestResponse(ok=False, provider_key=provider_key,
-                                    message=f"Connection test failed: {exc}")
+        return ProviderTestResponse(
+            ok=False,
+            provider_key=provider_key,
+            message=f"Connection test failed: {exc}",
+        )
 
     if row is not None:
         row.status = "connected" if result.ok else "failed"
@@ -160,6 +203,9 @@ async def test_provider(provider_key: str, payload: TestRequest,
         await db.commit()
 
     return ProviderTestResponse(
-        ok=result.ok, provider_key=provider_key, message=result.message,
-        latency_ms=result.latency_ms, details=result.details,
+        ok=result.ok,
+        provider_key=provider_key,
+        message=result.message,
+        latency_ms=result.latency_ms,
+        details=result.details,
     )

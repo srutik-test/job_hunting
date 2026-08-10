@@ -63,7 +63,9 @@ class Settings(BaseSettings):
     # One of: none | dev-math | turnstile | recaptcha | hcaptcha
     CAPTCHA_PROVIDER: str = "dev-math"
     CAPTCHA_SECRET_KEY: Optional[str] = None
-    CAPTCHA_SITE_KEY: Optional[str] = None  # surfaced to the frontend via /auth/captcha/config
+    CAPTCHA_SITE_KEY: Optional[str] = (
+        None  # surfaced to the frontend via /auth/captcha/config
+    )
 
     # ------------------------------------------------------------------ Crawler
     CRAWLER_MAX_CONCURRENCY: int = 5
@@ -102,8 +104,8 @@ class Settings(BaseSettings):
     SMTP_VERIFICATION_FROM: str = "verify@example.com"
 
     # ------------------------------------------------------------------ Rate limiting
-    RATE_LIMIT_AUTH: str = "8/minute"          # register/login/captcha-prone endpoints
-    RATE_LIMIT_SEARCH: str = "20/minute"       # starting searches
+    RATE_LIMIT_AUTH: str = "8/minute"  # register/login/captcha-prone endpoints
+    RATE_LIMIT_SEARCH: str = "20/minute"  # starting searches
     RATE_LIMIT_DEFAULT: str = "240/minute"
 
     # ------------------------------------------------------------------ Storage

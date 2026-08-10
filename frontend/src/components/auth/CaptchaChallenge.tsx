@@ -18,9 +18,15 @@ interface Props {
 
 declare global {
   interface Window {
-    turnstile?: { render: (el: HTMLElement, opts: Record<string, unknown>) => void };
-    grecaptcha?: { render: (el: HTMLElement, opts: Record<string, unknown>) => void };
-    hcaptcha?: { render: (el: HTMLElement, opts: Record<string, unknown>) => void };
+    turnstile?: {
+      render: (el: HTMLElement, opts: Record<string, unknown>) => void;
+    };
+    grecaptcha?: {
+      render: (el: HTMLElement, opts: Record<string, unknown>) => void;
+    };
+    hcaptcha?: {
+      render: (el: HTMLElement, opts: Record<string, unknown>) => void;
+    };
   }
 }
 
@@ -61,12 +67,14 @@ export default function CaptchaChallenge({ value, onChange }: Props) {
 
   // Third-party widget rendering (Turnstile / reCAPTCHA / hCaptcha).
   useEffect(() => {
-    if (!challenge || challenge.provider === "dev-math" || challenge.provider === "none")
-      return;
+    if (!challenge) return;
+
+    const provider = challenge.provider ?? "none";
+    if (provider === "dev-math" || provider === "none") return;
     if (!challenge.site_key || renderedRef.current) return;
 
     const script = document.createElement("script");
-    script.src = WIDGET_SCRIPTS[challenge.provider];
+    script.src = WIDGET_SCRIPTS[provider];
     script.async = true;
     script.defer = true;
     script.onload = () => {
@@ -75,11 +83,11 @@ export default function CaptchaChallenge({ value, onChange }: Props) {
         sitekey: challenge.site_key,
         callback: (token: string) => onChange({ captcha_token: token }),
       };
-      if (challenge.provider === "turnstile" && window.turnstile) {
+      if (provider === "turnstile" && window.turnstile) {
         window.turnstile.render(widgetRef.current, opts);
-      } else if (challenge.provider === "recaptcha" && window.grecaptcha) {
+      } else if (provider === "recaptcha" && window.grecaptcha) {
         window.grecaptcha.render(widgetRef.current, opts);
-      } else if (challenge.provider === "hcaptcha" && window.hcaptcha) {
+      } else if (provider === "hcaptcha" && window.hcaptcha) {
         window.hcaptcha.render(widgetRef.current, opts);
       }
       renderedRef.current = true;
@@ -94,9 +102,12 @@ export default function CaptchaChallenge({ value, onChange }: Props) {
       </div>
     );
   }
-  if (challenge.provider === "none" || challenge.enabled === false) return null;
 
-  if (challenge.provider === "dev-math") {
+  const provider = challenge.provider ?? "none";
+
+  if (provider === "none" || challenge.enabled === false) return null;
+
+  if (provider === "dev-math") {
     return (
       <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 p-3 space-y-2">
         <div className="flex items-center justify-between">
@@ -115,14 +126,19 @@ export default function CaptchaChallenge({ value, onChange }: Props) {
             <RefreshCw className="h-3.5 w-3.5" />
           </button>
         </div>
-        <p className="text-sm text-slate-700 dark:text-slate-200">{challenge.question}</p>
+        <p className="text-sm text-slate-700 dark:text-slate-200">
+          {challenge.question}
+        </p>
         <input
           type="text"
           inputMode="numeric"
           required
           value={value.captcha_answer || ""}
           onChange={(e) =>
-            onChange({ captcha_id: value.captcha_id, captcha_answer: e.target.value })
+            onChange({
+              captcha_id: value.captcha_id,
+              captcha_answer: e.target.value,
+            })
           }
           placeholder="Your answer"
           className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
@@ -136,13 +152,13 @@ export default function CaptchaChallenge({ value, onChange }: Props) {
       <div className="flex items-center space-x-2">
         <ShieldCheck className="h-4 w-4 text-blue-500" />
         <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 capitalize">
-          {challenge.provider} verification
+          {provider} verification
         </span>
       </div>
-      <div ref={widgetRef} className={WIDGET_CLASSES[challenge.provider]} />
+      <div ref={widgetRef} className={WIDGET_CLASSES[provider]} />
       {!challenge.site_key && (
         <p className="text-xs text-amber-500">
-          No site key configured on the server for {challenge.provider}.
+          No site key configured on the server for {provider}.
         </p>
       )}
     </div>

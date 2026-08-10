@@ -61,8 +61,7 @@ async def client(tmp_path) -> AsyncGenerator:
     worker_module.AsyncSessionLocal = Session
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport,
-                           base_url="http://testserver") as ac:
+    async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
         yield ac, Session
 
     worker_module.AsyncSessionLocal = original_worker_session
@@ -70,18 +69,27 @@ async def client(tmp_path) -> AsyncGenerator:
     await engine.dispose()
 
 
-async def register_and_verify(client: AsyncClient, Session,
-                              email: str = TEST_EMAIL,
-                              password: str = TEST_PASSWORD,
-                              name: str = "Test User") -> dict:
+async def register_and_verify(
+    client: AsyncClient,
+    Session,
+    email: str = TEST_EMAIL,
+    password: str = TEST_PASSWORD,
+    name: str = "Test User",
+) -> dict:
     """Register a user, mark the email verified in the DB, and log in."""
-    resp = await client.post("/api/v1/auth/register", json={
-        "name": name, "email": email, "password": password,
-    })
+    resp = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "name": name,
+            "email": email,
+            "password": password,
+        },
+    )
     assert resp.status_code == 201, resp.text
 
     from app.models import User
     from sqlalchemy import select
+
     async with Session() as db:
         res = await db.execute(select(User).where(User.email == email))
         user = res.scalars().one()
@@ -89,7 +97,8 @@ async def register_and_verify(client: AsyncClient, Session,
         user.account_status = "active"
         await db.commit()
 
-    resp = await client.post("/api/v1/auth/login",
-                             json={"email": email, "password": password})
+    resp = await client.post(
+        "/api/v1/auth/login", json={"email": email, "password": password, "captcha": captcha_answer}
+    )
     assert resp.status_code == 200, resp.text
     return resp.json()

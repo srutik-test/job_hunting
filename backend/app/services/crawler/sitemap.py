@@ -30,8 +30,12 @@ class SitemapParser:
 
         for loc in locations:
             try:
-                resp = await client.get(loc, headers=self.headers, timeout=self.timeout,
-                                        follow_redirects=True)
+                resp = await client.get(
+                    loc,
+                    headers=self.headers,
+                    timeout=self.timeout,
+                    follow_redirects=True,
+                )
                 if resp.status_code != 200:
                     continue
                 if loc.endswith("robots.txt"):
@@ -62,8 +66,9 @@ class SitemapParser:
 
     async def _fetch_xml(self, url: str, client: httpx.AsyncClient) -> Set[str]:
         try:
-            resp = await client.get(url, headers=self.headers, timeout=self.timeout,
-                                    follow_redirects=True)
+            resp = await client.get(
+                url, headers=self.headers, timeout=self.timeout, follow_redirects=True
+            )
             if resp.status_code == 200:
                 return self._extract_urls(resp.text)
         except Exception:

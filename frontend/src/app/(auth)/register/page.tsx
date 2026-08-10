@@ -19,7 +19,10 @@ export default function RegisterPage() {
   const [captcha, setCaptcha] = useState<CaptchaValue>({});
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState<{ message: string; devLink?: string } | null>(null);
+  const [done, setDone] = useState<{
+    message: string;
+    devLink?: string;
+  } | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -41,7 +44,10 @@ export default function RegisterPage() {
 
   if (done) {
     return (
-      <AuthCard title="Check your inbox" subtitle="Account created successfully">
+      <AuthCard
+        title="Check your inbox"
+        subtitle="Account created successfully"
+      >
         <div className="space-y-4 text-sm text-slate-600 dark:text-slate-300">
           <p>{done.message}</p>
           {done.devLink && (
@@ -69,12 +75,20 @@ export default function RegisterPage() {
   }
 
   return (
-    <AuthCard title="Create your account" subtitle="Verified HR contacts. Zero fabricated emails.">
+    <AuthCard
+      title="Create your account"
+      subtitle="Verified HR contacts. Zero fabricated emails."
+    >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Full name</label>
+          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
+            Full name
+          </label>
           <input
-            type="text" required minLength={2} value={name}
+            type="text"
+            required
+            minLength={2}
+            value={name}
             onChange={(e) => setName(e.target.value)}
             autoComplete="name"
             className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
@@ -82,9 +96,13 @@ export default function RegisterPage() {
           />
         </div>
         <div>
-          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Email address</label>
+          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
+            Email address
+          </label>
           <input
-            type="email" required value={email}
+            type="email"
+            required
+            value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
             className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
@@ -92,18 +110,30 @@ export default function RegisterPage() {
           />
         </div>
         <div>
-          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Password</label>
+          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
+            Password
+          </label>
           <div className="relative">
             <input
-              type={showPw ? "text" : "password"} required minLength={8}
-              value={password} onChange={(e) => setPassword(e.target.value)}
+              type={showPw ? "text" : "password"}
+              required
+              minLength={8}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               autoComplete="new-password"
               className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2.5 pr-10 text-sm outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="At least 8 characters"
             />
-            <button type="button" onClick={() => setShowPw(!showPw)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
-              {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            <button
+              type="button"
+              onClick={() => setShowPw(!showPw)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+            >
+              {showPw ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
             </button>
           </div>
           <p className="mt-1 text-xs text-slate-400">Minimum 8 characters.</p>
@@ -118,17 +148,25 @@ export default function RegisterPage() {
         )}
 
         <button
-          type="submit" disabled={busy}
+          type="submit"
+          disabled={busy}
           className="w-full inline-flex items-center justify-center space-x-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60 transition"
         >
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+          {busy ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <UserPlus className="h-4 w-4" />
+          )}
           <span>{busy ? "Creating account…" : "Create account"}</span>
         </button>
       </form>
 
       <p className="mt-5 text-center text-xs text-slate-500 dark:text-slate-400">
         Already registered?{" "}
-        <Link href="/login" className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+        <Link
+          href="/login"
+          className="font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+        >
           Sign in
         </Link>
       </p>

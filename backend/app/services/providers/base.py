@@ -53,7 +53,7 @@ class FoundEmail(BaseModel):
     last_name: Optional[str] = None
     position: Optional[str] = None
     source_url: Optional[str] = None
-    provider_verified: bool = False       # provider states the address is deliverable
+    provider_verified: bool = False  # provider states the address is deliverable
     provider_score: Optional[int] = None  # provider's own evidence score if any
 
 
@@ -71,10 +71,10 @@ class CapabilityProvider(ABC):
 
     key: str = "abstract"
     display_name: str = "Abstract Provider"
-    capabilities: List[str] = []           # crawler|search|email_finder|email_verifier|people
+    capabilities: List[str] = []  # crawler|search|email_finder|email_verifier|people
     is_free: bool = False
     requires_api_key: bool = True
-    env_key_names: List[str] = []          # env var names checked as fallback config
+    env_key_names: List[str] = []  # env var names checked as fallback config
     signup_url: Optional[str] = None
 
     def configured_via_env(self) -> bool:
@@ -130,8 +130,9 @@ class ProviderManager:
         )
         return res.scalars().first()
 
-    async def resolve(self, capability: str) -> tuple[
-        Optional[CapabilityProvider], Optional[str], str]:
+    async def resolve(
+        self, capability: str
+    ) -> tuple[Optional[CapabilityProvider], Optional[str], str]:
         """
         Returns (provider, api_key, origin) where origin is
         'database' | 'environment' | 'free-default' | 'unavailable'.
@@ -142,7 +143,11 @@ class ProviderManager:
         for provider in candidates:
             cfg = await self._user_config(provider.key)
             if cfg and cfg.enabled:
-                key = decrypt_secret(cfg.api_key_encrypted) if cfg.api_key_encrypted else None
+                key = (
+                    decrypt_secret(cfg.api_key_encrypted)
+                    if cfg.api_key_encrypted
+                    else None
+                )
                 if key or not provider.requires_api_key:
                     return provider, key, "database"
 
@@ -150,8 +155,12 @@ class ProviderManager:
         for provider in candidates:
             if provider.configured_via_env():
                 key = next(
-                    (getattr(settings, n) for n in provider.env_key_names
-                     if getattr(settings, n, None)), None
+                    (
+                        getattr(settings, n)
+                        for n in provider.env_key_names
+                        if getattr(settings, n, None)
+                    ),
+                    None,
                 )
                 return provider, key, "environment"
 
@@ -159,7 +168,11 @@ class ProviderManager:
         default_key = FREE_DEFAULTS.get(capability)
         if default_key:
             provider = ProviderRegistry.get(default_key)
-            if provider and capability in provider.capabilities and not provider.requires_api_key:
+            if (
+                provider
+                and capability in provider.capabilities
+                and not provider.requires_api_key
+            ):
                 return provider, None, "free-default"
 
         return None, None, "unavailable"
@@ -173,14 +186,20 @@ class ProviderManager:
         provider = ProviderRegistry.get(provider_key)
         if provider:
             return next(
-                (getattr(settings, n) for n in provider.env_key_names
-                 if getattr(settings, n, None)), None
+                (
+                    getattr(settings, n)
+                    for n in provider.env_key_names
+                    if getattr(settings, n, None)
+                ),
+                None,
             )
         return None
 
 
 # --------------------------------------------------------------------- HTTP helpers
-async def call_with_timing(method: str, url: str, **kwargs) -> tuple[Optional[httpx.Response], int, Optional[str]]:
+async def call_with_timing(
+    method: str, url: str, **kwargs
+) -> tuple[Optional[httpx.Response], int, Optional[str]]:
     """HTTP helper used by provider test-connection implementations."""
     start = time.monotonic()
     try:

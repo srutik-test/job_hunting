@@ -38,15 +38,20 @@ export default function SearchesPage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">Searches</h1>
+        <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">
+          Searches
+        </h1>
         <div className="flex space-x-2">
           {FILTERS.map((f) => (
-            <button key={f.value} onClick={() => setFilter(f.value)}
+            <button
+              key={f.value}
+              onClick={() => setFilter(f.value)}
               className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
                 filter === f.value
                   ? "bg-blue-600 text-white"
                   : "bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
-              }`}>
+              }`}
+            >
               {f.label}
             </button>
           ))}

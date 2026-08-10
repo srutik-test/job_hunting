@@ -29,11 +29,11 @@ class CrawlResult(BaseModel):
     all_linkedin_urls: Set[str] = set()
     sitemap_found: bool = False
     robots_disallowed: int = 0
-    needs_js: bool = False          # light crawl suggests JS rendering is required
-    blocked: bool = False           # anti-bot protection detected (e.g. Cloudflare)
+    needs_js: bool = False  # light crawl suggests JS rendering is required
+    blocked: bool = False  # anti-bot protection detected (e.g. Cloudflare)
     blocked_reason: str = ""
     duration_seconds: float = 0.0
     errors: List[str] = []
-    engine: str = "http"            # http | playwright | firecrawl
+    engine: str = "http"  # http | playwright | firecrawl
 
     model_config = {"arbitrary_types_allowed": True}

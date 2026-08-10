@@ -14,24 +14,86 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 HR_LOCAL_PARTS = {
-    "hr", "humanresources", "hroffice", "hrteam", "hrdept", "hropes", "hradmin",
-    "people", "peopleops", "peopleoperations", "peopleteam", "culture",
+    "hr",
+    "humanresources",
+    "hroffice",
+    "hrteam",
+    "hrdept",
+    "hropes",
+    "hradmin",
+    "people",
+    "peopleops",
+    "peopleoperations",
+    "peopleteam",
+    "culture",
 }
 RECRUIT_LOCAL_PARTS = {
-    "recruitment", "recruiting", "recruiter", "recruit", "recruiters",
-    "recruitmentteam", "talent", "talentacquisition", "talents", "talentsearch",
-    "talentacquisitionteam", "staffing", "sourcing", "ta", "tateam",
+    "recruitment",
+    "recruiting",
+    "recruiter",
+    "recruit",
+    "recruiters",
+    "recruitmentteam",
+    "talent",
+    "talentacquisition",
+    "talents",
+    "talentsearch",
+    "talentacquisitionteam",
+    "staffing",
+    "sourcing",
+    "ta",
+    "tateam",
 }
 CAREERS_LOCAL_PARTS = {
-    "careers", "career", "jobs", "job", "hiring", "joinus", "join", "apply",
-    "opportunities", "employment", "openings", "vacancies", "workwithus",
+    "careers",
+    "career",
+    "jobs",
+    "job",
+    "hiring",
+    "joinus",
+    "join",
+    "apply",
+    "opportunities",
+    "employment",
+    "openings",
+    "vacancies",
+    "workwithus",
 }
 GENERIC_LOCAL_PARTS = {
-    "info", "support", "admin", "sales", "contact", "hello", "hi", "marketing",
-    "finance", "accounts", "billing", "press", "media", "help", "enquiry",
-    "inquiry", "feedback", "service", "office", "frontdesk", "inbox", "general",
-    "webmaster", "postmaster", "security", "noreply", "no-reply", "mail",
-    "customerservice", "it", "tech", "legal", "privacy", "abuse",
+    "info",
+    "support",
+    "admin",
+    "sales",
+    "contact",
+    "hello",
+    "hi",
+    "marketing",
+    "finance",
+    "accounts",
+    "billing",
+    "press",
+    "media",
+    "help",
+    "enquiry",
+    "inquiry",
+    "feedback",
+    "service",
+    "office",
+    "frontdesk",
+    "inbox",
+    "general",
+    "webmaster",
+    "postmaster",
+    "security",
+    "noreply",
+    "no-reply",
+    "mail",
+    "customerservice",
+    "it",
+    "tech",
+    "legal",
+    "privacy",
+    "abuse",
 }
 
 HR_CONTEXT_TERMS = re.compile(
@@ -48,7 +110,7 @@ class EmailCandidate(BaseModel):
     # hr | recruitment | careers | personal | generic | unknown
     relation: str
     is_generic: bool
-    context_strength: int = 0   # 0-5 heuristic context signal, NOT a confidence score
+    context_strength: int = 0  # 0-5 heuristic context signal, NOT a confidence score
     source_url: str = ""
     page_type: str = "general"
     context_snippet: str = ""

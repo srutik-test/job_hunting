@@ -15,14 +15,24 @@ from app.core.database import get_db
 from app.core.deps import ACCESS_COOKIE, get_current_user
 from app.core.rate_limit import rate_limit
 from app.core.security import (
-    create_access_token, create_email_verification_token,
-    create_password_reset_token, decode_token, hash_password,
-    token_fingerprint, verify_password,
+    create_access_token,
+    create_email_verification_token,
+    create_password_reset_token,
+    decode_token,
+    hash_password,
+    token_fingerprint,
+    verify_password,
 )
 from app.models import AuthToken, User
 from app.schemas.auth import (
-    CaptchaChallenge, ForgotPasswordRequest, LoginRequest, MessageResponse,
-    RegisterRequest, ResetPasswordRequest, TokenResponse, UserPublic,
+    CaptchaChallenge,
+    ForgotPasswordRequest,
+    LoginRequest,
+    MessageResponse,
+    RegisterRequest,
+    ResetPasswordRequest,
+    TokenResponse,
+    UserPublic,
     VerifyEmailRequest,
 )
 from app.services import captcha as captcha_service
@@ -35,10 +45,13 @@ _auth_limit = rate_limit(settings.RATE_LIMIT_AUTH, scope="auth")
 
 def _set_auth_cookie(response: Response, token: str) -> None:
     response.set_cookie(
-        ACCESS_COOKIE, token,
+        ACCESS_COOKIE,
+        token,
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        httponly=True, secure=settings.COOKIE_SECURE,
-        samesite=settings.COOKIE_SAMESITE, path="/",
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite=settings.COOKIE_SAMESITE,
+        path="/",
     )
 
 
@@ -54,8 +67,10 @@ async def _ensure_captcha(payload: object, request: Request) -> None:
         remote_ip=request.client.host if request.client else None,
     )
     if not ok:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=reason or "CAPTCHA verification failed.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=reason or "CAPTCHA verification failed.",
+        )
 
 
 # ------------------------------------------------------------------ captcha
@@ -76,22 +91,28 @@ async def captcha_challenge():
 
 
 # ------------------------------------------------------------------ registration
-@router.post("/register", response_model=MessageResponse, status_code=201,
-             dependencies=[Depends(_auth_limit)])
-async def register(payload: RegisterRequest, request: Request,
-                   db: AsyncSession = Depends(get_db)):
+@router.post(
+    "/register",
+    response_model=MessageResponse,
+    status_code=201,
+    dependencies=[Depends(_auth_limit)],
+)
+async def register(
+    payload: RegisterRequest, request: Request, db: AsyncSession = Depends(get_db)
+):
     await _ensure_captcha(payload, request)
 
     email = payload.email.lower()
     res = await db.execute(select(User).where(User.email == email))
     if res.scalars().first() is not None:
-        raise HTTPException(status_code=409,
-                            detail="An account with this email already exists.")
+        raise HTTPException(
+            status_code=409, detail="An account with this email already exists."
+        )
 
     user = User(
         email=email,
         name=payload.name.strip(),
-        hashed_password=hash_password(payload.password),
+        hashed_password=hash_password(payload.password), 
         auth_provider="email",
         is_email_verified=False,
         account_status="pending",
@@ -102,40 +123,54 @@ async def register(payload: RegisterRequest, request: Request,
     await db.refresh(user)
 
     token = create_email_verification_token(user.id)
-    db.add(AuthToken(
-        user_id=user.id, purpose="verify-email",
-        token_hash=token_fingerprint(token),
-        expires_at=datetime.now(timezone.utc)
-        + timedelta(minutes=settings.EMAIL_VERIFICATION_EXPIRE_MINUTES),
-    ))
+    db.add(
+        AuthToken(
+            user_id=user.id,
+            purpose="verify-email",
+            token_hash=token_fingerprint(token),
+            expires_at=datetime.now(timezone.utc)
+            + timedelta(minutes=settings.EMAIL_VERIFICATION_EXPIRE_MINUTES),
+        )
+    )
     await db.commit()
 
     link = f"{settings.FRONTEND_URL}/verify-email?token={token}"
     sent = await mailer.send_verification_email(user.email, user.name, link)
     dev_link = None if sent else link
     return MessageResponse(
-        message=("Registration successful. Please check your inbox to verify "
-                 "your email address." if sent else
-                 "Registration successful (development mode: SMTP not configured "
-                 "– use the returned verification link)."),
+        message=(
+            "Registration successful. Please check your inbox to verify "
+            "your email address."
+            if sent
+            else "Registration successful (development mode: SMTP not configured "
+            "– use the returned verification link)."
+        ),
         dev_link=dev_link if settings.DEBUG else None,
     )
 
 
 # ------------------------------------------------------------------ login/logout
-@router.post("/login", response_model=UserPublic,
-             dependencies=[Depends(_auth_limit)])
-async def login(payload: LoginRequest, request: Request, response: Response,
-                db: AsyncSession = Depends(get_db)):
+@router.post("/login", response_model=UserPublic, dependencies=[Depends(_auth_limit)])
+async def login(
+    payload: LoginRequest,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
     await _ensure_captcha(payload, request)
 
     email = payload.email.lower()
     res = await db.execute(select(User).where(User.email == email))
     user = res.scalars().first()
-    if user is None or not user.hashed_password or \
-            not verify_password(payload.password, user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                            detail="Invalid email or password.")
+    if (
+        user is None
+        or not user.hashed_password
+        or not verify_password(payload.password, user.hashed_password)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password.",
+        )
     if user.account_status == "disabled":
         raise HTTPException(status_code=403, detail="Account is disabled.")
 
@@ -162,12 +197,14 @@ async def me(user: User = Depends(get_current_user)):
 
 # ------------------------------------------------------------------ verification
 @router.post("/verify-email", response_model=UserPublic)
-async def verify_email(payload: VerifyEmailRequest, response: Response,
-                       db: AsyncSession = Depends(get_db)):
+async def verify_email(
+    payload: VerifyEmailRequest, response: Response, db: AsyncSession = Depends(get_db)
+):
     data = decode_token(payload.token, "verify-email")
     if not data:
-        raise HTTPException(status_code=400,
-                            detail="Invalid or expired verification link.")
+        raise HTTPException(
+            status_code=400, detail="Invalid or expired verification link."
+        )
 
     res = await db.execute(
         select(AuthToken).where(
@@ -196,52 +233,71 @@ async def verify_email(payload: VerifyEmailRequest, response: Response,
     return _public(user)
 
 
-@router.post("/resend-verification", response_model=MessageResponse,
-             dependencies=[Depends(_auth_limit)])
-async def resend_verification(user: User = Depends(get_current_user),
-                              db: AsyncSession = Depends(get_db)):
+@router.post(
+    "/resend-verification",
+    response_model=MessageResponse,
+    dependencies=[Depends(_auth_limit)],
+)
+async def resend_verification(
+    user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
     if user.is_email_verified:
         return MessageResponse(message="Email address is already verified.")
     token = create_email_verification_token(user.id)
-    db.add(AuthToken(
-        user_id=user.id, purpose="verify-email",
-        token_hash=token_fingerprint(token),
-        expires_at=datetime.now(timezone.utc)
-        + timedelta(minutes=settings.EMAIL_VERIFICATION_EXPIRE_MINUTES),
-    ))
+    db.add(
+        AuthToken(
+            user_id=user.id,
+            purpose="verify-email",
+            token_hash=token_fingerprint(token),
+            expires_at=datetime.now(timezone.utc)
+            + timedelta(minutes=settings.EMAIL_VERIFICATION_EXPIRE_MINUTES),
+        )
+    )
     await db.commit()
     link = f"{settings.FRONTEND_URL}/verify-email?token={token}"
     sent = await mailer.send_verification_email(user.email, user.name, link)
     return MessageResponse(
-        message="Verification email sent." if sent else
-        "Verification link generated (development mode).",
+        message=(
+            "Verification email sent."
+            if sent
+            else "Verification link generated (development mode)."
+        ),
         dev_link=None if sent else (link if settings.DEBUG else None),
     )
 
 
 # ------------------------------------------------------------------ password reset
-@router.post("/forgot-password", response_model=MessageResponse,
-             dependencies=[Depends(_auth_limit)])
-async def forgot_password(payload: ForgotPasswordRequest, request: Request,
-                          db: AsyncSession = Depends(get_db)):
+@router.post(
+    "/forgot-password",
+    response_model=MessageResponse,
+    dependencies=[Depends(_auth_limit)],
+)
+async def forgot_password(
+    payload: ForgotPasswordRequest, request: Request, db: AsyncSession = Depends(get_db)
+):
     await _ensure_captcha(payload, request)
 
     email = payload.email.lower()
     res = await db.execute(select(User).where(User.email == email))
     user = res.scalars().first()
 
-    generic = ("If an account exists for this email address, a password reset "
-               "link has been sent.")
+    generic = (
+        "If an account exists for this email address, a password reset "
+        "link has been sent."
+    )
     if user is None or not user.hashed_password:
         return MessageResponse(message=generic)
 
     token = create_password_reset_token(user.id)
-    db.add(AuthToken(
-        user_id=user.id, purpose="reset-password",
-        token_hash=token_fingerprint(token),
-        expires_at=datetime.now(timezone.utc)
-        + timedelta(minutes=settings.PASSWORD_RESET_EXPIRE_MINUTES),
-    ))
+    db.add(
+        AuthToken(
+            user_id=user.id,
+            purpose="reset-password",
+            token_hash=token_fingerprint(token),
+            expires_at=datetime.now(timezone.utc)
+            + timedelta(minutes=settings.PASSWORD_RESET_EXPIRE_MINUTES),
+        )
+    )
     await db.commit()
 
     link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
@@ -253,12 +309,12 @@ async def forgot_password(payload: ForgotPasswordRequest, request: Request,
 
 
 @router.post("/reset-password", response_model=MessageResponse)
-async def reset_password(payload: ResetPasswordRequest,
-                         db: AsyncSession = Depends(get_db)):
+async def reset_password(
+    payload: ResetPasswordRequest, db: AsyncSession = Depends(get_db)
+):
     data = decode_token(payload.token, "reset-password")
     if not data:
-        raise HTTPException(status_code=400,
-                            detail="Invalid or expired reset link.")
+        raise HTTPException(status_code=400, detail="Invalid or expired reset link.")
 
     res = await db.execute(
         select(AuthToken).where(
@@ -268,8 +324,7 @@ async def reset_password(payload: ResetPasswordRequest,
     )
     record = res.scalars().first()
     if record is None or record.used:
-        raise HTTPException(status_code=400,
-                            detail="Reset link has already been used.")
+        raise HTTPException(status_code=400, detail="Reset link has already been used.")
     expires_naive = record.expires_at.replace(tzinfo=None)
     if expires_naive < datetime.now(timezone.utc).replace(tzinfo=None):
         raise HTTPException(status_code=400, detail="Reset link has expired.")
@@ -298,12 +353,16 @@ def _google_redirect_uri() -> str:
 @router.get("/google/login")
 async def google_login():
     if not settings.GOOGLE_CLIENT_ID:
-        raise HTTPException(status_code=501,
-                            detail="Google sign-in is not configured on the server.")
+        raise HTTPException(
+            status_code=501, detail="Google sign-in is not configured on the server."
+        )
     state = jwt.encode(
-        {"purpose": "oauth-state",
-         "exp": datetime.now(timezone.utc) + timedelta(minutes=10)},
-        settings.SECRET_KEY, algorithm=settings.ALGORITHM,
+        {
+            "purpose": "oauth-state",
+            "exp": datetime.now(timezone.utc) + timedelta(minutes=10),
+        },
+        settings.SECRET_KEY,
+        algorithm=settings.ALGORITHM,
     )
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
@@ -315,13 +374,17 @@ async def google_login():
         "prompt": "select_account",
     }
     from urllib.parse import urlencode
+
     return RedirectResponse(f"{GOOGLE_AUTH_URL}?{urlencode(params)}")
 
 
 @router.get("/google/callback")
-async def google_callback(response: Response, code: Optional[str] = Query(None),
-                          state: Optional[str] = Query(None),
-                          db: AsyncSession = Depends(get_db)):
+async def google_callback(
+    response: Response,
+    code: Optional[str] = Query(None),
+    state: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
     frontend = settings.FRONTEND_URL.rstrip("/")
     if not code or not state:
         return RedirectResponse(f"{frontend}/login?error=oauth_failed")
@@ -332,18 +395,22 @@ async def google_callback(response: Response, code: Optional[str] = Query(None),
 
     try:
         async with httpx.AsyncClient(timeout=15) as client:
-            token_resp = await client.post(GOOGLE_TOKEN_URL, data={
-                "code": code,
-                "client_id": settings.GOOGLE_CLIENT_ID,
-                "client_secret": settings.GOOGLE_CLIENT_SECRET,
-                "redirect_uri": _google_redirect_uri(),
-                "grant_type": "authorization_code",
-            })
+            token_resp = await client.post(
+                GOOGLE_TOKEN_URL,
+                data={
+                    "code": code,
+                    "client_id": settings.GOOGLE_CLIENT_ID,
+                    "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                    "redirect_uri": _google_redirect_uri(),
+                    "grant_type": "authorization_code",
+                },
+            )
             if token_resp.status_code != 200:
                 raise ValueError("token exchange failed")
             id_token = token_resp.json().get("id_token")
-            info_resp = await client.get(GOOGLE_TOKENINFO_URL,
-                                         params={"id_token": id_token})
+            info_resp = await client.get(
+                GOOGLE_TOKENINFO_URL, params={"id_token": id_token}
+            )
             if info_resp.status_code != 200:
                 raise ValueError("tokeninfo failed")
             info = info_resp.json()
@@ -360,8 +427,10 @@ async def google_callback(response: Response, code: Optional[str] = Query(None),
     user = res.scalars().first()
     if user is None:
         user = User(
-            email=email, name=info.get("name") or email.split("@")[0],
-            auth_provider="google", google_sub=google_sub,
+            email=email,
+            name=info.get("name") or email.split("@")[0],
+            auth_provider="google",
+            google_sub=google_sub,
             profile_picture=info.get("picture"),
             is_email_verified=email_verified,
             account_status="active" if email_verified else "pending",

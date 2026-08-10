@@ -6,10 +6,10 @@ from pydantic import BaseModel, EmailStr, Field
 
 class CaptchaChallenge(BaseModel):
     enabled: bool = True
-    provider: str = "dev-math"               # none | dev-math | turnstile | recaptcha | hcaptcha
-    site_key: Optional[str] = None           # for client-rendered widgets
-    captcha_id: Optional[str] = None         # for dev-math flow
-    question: Optional[str] = None           # for dev-math flow
+    provider: str = "dev-math"  # none | dev-math | turnstile | recaptcha | hcaptcha
+    site_key: Optional[str] = None  # for client-rendered widgets
+    captcha_id: Optional[str] = None  # for dev-math flow
+    question: Optional[str] = None  # for dev-math flow
 
 
 class RegisterRequest(BaseModel):
@@ -18,7 +18,7 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     captcha_id: Optional[str] = None
     captcha_answer: Optional[str] = None
-    captcha_token: Optional[str] = None      # provider-verified token
+    captcha_token: Optional[str] = None  # provider-verified token
 
 
 class LoginRequest(BaseModel):

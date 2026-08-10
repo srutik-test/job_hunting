@@ -26,7 +26,6 @@ from typing import Optional, Tuple
 from app.services.verification.email_verifier import VerificationLevel
 from app.services.extraction.classifier import EmailCandidate, is_hr_related
 
-
 VERIFIED = "verified"
 PARTIALLY_VERIFIED = "partially_verified"
 UNVERIFIED = "unverified"
@@ -35,7 +34,7 @@ UNVERIFIED = "unverified"
 def score_for_email(
     candidate: EmailCandidate,
     verification: VerificationLevel,
-    source_type: str,   # company_website | search_provider | email_finder | people_provider
+    source_type: str,  # company_website | search_provider | email_finder | people_provider
     provider_says_verified: bool = False,
 ) -> Tuple[str, str, int, str]:
     """
@@ -50,16 +49,19 @@ def score_for_email(
     if verification in (VerificationLevel.INVALID, VerificationLevel.ERROR):
         return UNVERIFIED, "company_email", 0, "not_hr"
 
-    verified_by_check = verification in (
-        VerificationLevel.MX_OK, VerificationLevel.SMTP_OK
-    ) or provider_says_verified
+    verified_by_check = (
+        verification in (VerificationLevel.MX_OK, VerificationLevel.SMTP_OK)
+        or provider_says_verified
+    )
 
     if source_type == "company_website":
         if verified_by_check:
             base = 95 if hr_related else 90
-            status = VERIFIED if verification in (
-                VerificationLevel.MX_OK, VerificationLevel.SMTP_OK
-            ) else PARTIALLY_VERIFIED
+            status = (
+                VERIFIED
+                if verification in (VerificationLevel.MX_OK, VerificationLevel.SMTP_OK)
+                else PARTIALLY_VERIFIED
+            )
         elif verification == VerificationLevel.DOMAIN_OK:
             base, status = 85, PARTIALLY_VERIFIED
         else:  # syntax-only
@@ -80,9 +82,11 @@ def score_for_email(
             base, status = 55, UNVERIFIED
 
     if hr_related:
-        category = "verified_hr" if (
-            status == VERIFIED and base >= 90 and source_type == "company_website"
-        ) else ("verified_hr" if provider_says_verified else "possible_hr")
+        category = (
+            "verified_hr"
+            if (status == VERIFIED and base >= 90 and source_type == "company_website")
+            else ("verified_hr" if provider_says_verified else "possible_hr")
+        )
         return status, category, base, "hr"
 
     # Not HR-related: keep as company email (real, but not an HR contact).

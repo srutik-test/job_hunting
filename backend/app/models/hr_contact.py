@@ -25,16 +25,28 @@ class HRContact(Base):
     __tablename__ = "hr_contacts"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    search_id = Column(String(36), ForeignKey("searches.id", ondelete="CASCADE"),
-                       nullable=False, index=True)
-    company_id = Column(String(36), ForeignKey("companies.id", ondelete="CASCADE"),
-                        nullable=False, index=True)
-    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"),
-                     nullable=False, index=True)
+    search_id = Column(
+        String(36),
+        ForeignKey("searches.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    company_id = Column(
+        String(36),
+        ForeignKey("companies.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id = Column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
 
-    name = Column(String(255), nullable=True)           # None when unknown
-    designation = Column(String(255), nullable=True)    # job title
-    email = Column(String(320), nullable=True)          # None when no email evidence
+    name = Column(String(255), nullable=True)  # None when unknown
+    designation = Column(String(255), nullable=True)  # job title
+    email = Column(String(320), nullable=True)  # None when no email evidence
     linkedin_url = Column(String(1024), nullable=True)
 
     # provenance
@@ -44,14 +56,18 @@ class HRContact(Base):
     provider_name = Column(String(120), nullable=True)
 
     verification_status = Column(String(50), nullable=False, default="unverified")
-    confidence_score = Column(Integer, nullable=False, default=0)  # 0-100, evidence based
-    contact_category = Column(String(50), nullable=False, default="company_email",
-                            index=True)
+    confidence_score = Column(
+        Integer, nullable=False, default=0
+    )  # 0-100, evidence based
+    contact_category = Column(
+        String(50), nullable=False, default="company_email", index=True
+    )
     discovery_method = Column(String(80), nullable=False, default="unknown")
     # website_crawl | browser_crawl | firecrawl | hunter | apollo | google_search | duckduckgo | linkedin_public_index
 
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc),
-                        index=True)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), index=True
+    )
 
     search = relationship("Search", back_populates="contacts")
 

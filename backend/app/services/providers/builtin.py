@@ -3,10 +3,14 @@
 from app.core.config import settings
 from app.services.crawler.http_crawler import HttpCrawler
 from app.services.providers.base import (
-    CapabilityProvider, ProviderRegistry, TestResult,
+    CapabilityProvider,
+    ProviderRegistry,
+    TestResult,
 )
 from app.services.verification.email_verifier import (
-    VerificationLevel, verify_email_local, mx_records,
+    VerificationLevel,
+    verify_email_local,
+    mx_records,
 )
 
 
@@ -43,6 +47,7 @@ class PlaywrightCrawlerProvider(CapabilityProvider):
 
     def available(self) -> bool:
         from app.services.crawler.browser_crawler import is_available
+
         return is_available()
 
     async def test_connection(self, api_key=None) -> TestResult:
@@ -50,16 +55,21 @@ class PlaywrightCrawlerProvider(CapabilityProvider):
             return TestResult(
                 ok=False,
                 message="Playwright is not installed/enabled. Install with "
-                        "`pip install playwright && playwright install chromium` and set "
-                        "ENABLE_PLAYWRIGHT=true.",
+                "`pip install playwright && playwright install chromium` and set "
+                "ENABLE_PLAYWRIGHT=true.",
             )
-        return TestResult(ok=True, message="Playwright Chromium crawler available.",
-                          details={"max_pages": settings.PLAYWRIGHT_MAX_PAGES})
+        return TestResult(
+            ok=True,
+            message="Playwright Chromium crawler available.",
+            details={"max_pages": settings.PLAYWRIGHT_MAX_PAGES},
+        )
 
     async def crawl_company(self, base_url, company_name="", progress_callback=None):
         from app.services.crawler.browser_crawler import BrowserCrawler
-        return await BrowserCrawler().crawl_company(base_url, company_name,
-                                                    progress_callback)
+
+        return await BrowserCrawler().crawl_company(
+            base_url, company_name, progress_callback
+        )
 
 
 class LocalMxVerifierProvider(CapabilityProvider):
@@ -73,15 +83,20 @@ class LocalMxVerifierProvider(CapabilityProvider):
         try:
             hosts = await mx_records("gmail.com")
             if hosts:
-                return TestResult(ok=True,
-                                  message="DNS resolution working (MX lookup succeeded).",
-                                  details={"sample_mx": hosts[:2]})
-            return TestResult(ok=False,
-                              message="DNS available but MX lookup returned no results.")
+                return TestResult(
+                    ok=True,
+                    message="DNS resolution working (MX lookup succeeded).",
+                    details={"sample_mx": hosts[:2]},
+                )
+            return TestResult(
+                ok=False, message="DNS available but MX lookup returned no results."
+            )
         except Exception as exc:
-            return TestResult(ok=False,
-                              message=f"DNS resolution failed: {exc}. Verification will "
-                                      "fall back to syntax-only checks.")
+            return TestResult(
+                ok=False,
+                message=f"DNS resolution failed: {exc}. Verification will "
+                "fall back to syntax-only checks.",
+            )
 
     async def verify(self, email: str) -> VerificationLevel:
         return await verify_email_local(email)

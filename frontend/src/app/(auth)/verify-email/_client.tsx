@@ -48,7 +48,10 @@ export default function VerifyEmailClient() {
 
   if (state === "ok") {
     return (
-      <AuthCard title="Email verified" subtitle="Your account is now fully active">
+      <AuthCard
+        title="Email verified"
+        subtitle="Your account is now fully active"
+      >
         <div className="space-y-4 text-center">
           <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-500" />
           <Link
@@ -63,11 +66,16 @@ export default function VerifyEmailClient() {
   }
 
   return (
-    <AuthCard title="Verification failed" subtitle={error || "This link is invalid or has expired"}>
+    <AuthCard
+      title="Verification failed"
+      subtitle={error || "This link is invalid or has expired"}
+    >
       <div className="space-y-3 text-center">
         <XCircle className="mx-auto h-10 w-10 text-red-500" />
-        <Link href="/login"
-          className="block rounded-lg border border-slate-300 dark:border-slate-700 px-4 py-2.5 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition">
+        <Link
+          href="/login"
+          className="block rounded-lg border border-slate-300 dark:border-slate-700 px-4 py-2.5 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+        >
           Back to sign in
         </Link>
       </div>

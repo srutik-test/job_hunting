@@ -19,8 +19,12 @@ async def list_companies(
     user: User = Depends(get_verified_user),
     db: AsyncSession = Depends(get_db),
 ):
-    stmt = (select(Company).where(Company.user_id == user.id)
-            .order_by(Company.created_at.desc()).limit(limit))
+    stmt = (
+        select(Company)
+        .where(Company.user_id == user.id)
+        .order_by(Company.created_at.desc())
+        .limit(limit)
+    )
     if q:
         stmt = stmt.where(Company.name.ilike(f"%{q}%"))
     res = await db.execute(stmt)
@@ -28,11 +32,14 @@ async def list_companies(
 
 
 @router.delete("/{company_id}", status_code=204)
-async def delete_company(company_id: str,
-                         user: User = Depends(get_verified_user),
-                         db: AsyncSession = Depends(get_db)):
-    res = await db.execute(select(Company).where(
-        Company.id == company_id, Company.user_id == user.id))
+async def delete_company(
+    company_id: str,
+    user: User = Depends(get_verified_user),
+    db: AsyncSession = Depends(get_db),
+):
+    res = await db.execute(
+        select(Company).where(Company.id == company_id, Company.user_id == user.id)
+    )
     company = res.scalars().first()
     if company is None:
         raise HTTPException(status_code=404, detail="Company not found.")

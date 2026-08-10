@@ -13,8 +13,12 @@ class Company(Base):
     __tablename__ = "companies"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"),
-                     nullable=False, index=True)
+    user_id = Column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
 
     name = Column(String(255), nullable=False, index=True)
     website = Column(String(1024), nullable=False)
@@ -23,12 +27,14 @@ class Company(Base):
     industry = Column(String(255), nullable=True, default="")
     meta = Column(Text, nullable=True, default="{}")  # JSON blob for extra metadata
 
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc),
-                        index=True)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), index=True
+    )
 
     user = relationship("User", back_populates="companies")
-    searches = relationship("Search", back_populates="company",
-                            cascade="all, delete-orphan")
+    searches = relationship(
+        "Search", back_populates="company", cascade="all, delete-orphan"
+    )
 
     def to_dict(self) -> dict:
         return {

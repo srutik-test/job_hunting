@@ -4,8 +4,19 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  Building2, LayoutDashboard, PlusCircle, Table2, Settings, LogOut,
-  ListChecks, Moon, Sun, Loader2, FileSpreadsheet, Download, User as UserIcon,
+  Building2,
+  LayoutDashboard,
+  PlusCircle,
+  Table2,
+  Settings,
+  LogOut,
+  ListChecks,
+  Moon,
+  Sun,
+  Loader2,
+  FileSpreadsheet,
+  Download,
+  User as UserIcon,
   AlertTriangle,
 } from "lucide-react";
 import { clsx } from "clsx";
@@ -38,7 +49,11 @@ function ThemeToggle() {
       }}
       className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
     >
-      {dark ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4" />}
+      {dark ? (
+        <Sun className="h-4 w-4 text-amber-400" />
+      ) : (
+        <Moon className="h-4 w-4" />
+      )}
     </button>
   );
 }
@@ -104,8 +119,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               >
                 {user.profile_picture ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={user.profile_picture} alt="avatar"
-                    className="h-6 w-6 rounded-full object-cover" />
+                  <img
+                    src={user.profile_picture}
+                    alt="avatar"
+                    className="h-6 w-6 rounded-full object-cover"
+                  />
                 ) : (
                   <UserIcon className="h-4 w-4 text-slate-500" />
                 )}
@@ -114,24 +132,34 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 </span>
               </button>
               {menuOpen && (
-                <div className="absolute right-0 mt-2 w-64 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl p-3 space-y-2 z-50"
-                  onMouseLeave={() => setMenuOpen(false)}>
+                <div
+                  className="absolute right-0 mt-2 w-64 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl p-3 space-y-2 z-50"
+                  onMouseLeave={() => setMenuOpen(false)}
+                >
                   <div className="px-2">
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{user.name}</p>
-                    <p className="text-xs text-slate-500 truncate">{user.email}</p>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                      {user.name}
+                    </p>
+                    <p className="text-xs text-slate-500 truncate">
+                      {user.email}
+                    </p>
                     <p className="mt-1 inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] text-slate-500 dark:text-slate-400 capitalize">
                       {user.auth_provider} account
                       {user.is_email_verified ? " · verified" : " · unverified"}
                     </p>
                   </div>
-                  <Link href="/settings"
+                  <Link
+                    href="/settings"
                     className="flex items-center space-x-2 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-                    onClick={() => setMenuOpen(false)}>
+                    onClick={() => setMenuOpen(false)}
+                  >
                     <Settings className="h-4 w-4" />
                     <span>Account & provider settings</span>
                   </Link>
-                  <button onClick={logout}
-                    className="w-full flex items-center space-x-2 rounded-lg px-3 py-2 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40">
+                  <button
+                    onClick={logout}
+                    className="w-full flex items-center space-x-2 rounded-lg px-3 py-2 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
+                  >
                     <LogOut className="h-4 w-4" />
                     <span>Sign out</span>
                   </button>
@@ -149,7 +177,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <span>
               Your email is not verified – searches are disabled until then.
               Check your inbox or resend the verification from{" "}
-              <Link href="/settings" className="underline font-semibold">Settings</Link>.
+              <Link href="/settings" className="underline font-semibold">
+                Settings
+              </Link>
+              .
             </span>
           </div>
         </div>
@@ -159,9 +190,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <aside className="w-16 lg:w-60 shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 p-3 lg:p-4">
           <nav className="space-y-1">
             {NAV.map((item) => {
-              const active = item.href === "/"
-                ? pathname === "/"
-                : pathname.startsWith(item.href);
+              const active =
+                item.href === "/"
+                  ? pathname === "/"
+                  : pathname.startsWith(item.href);
               const Icon = item.icon;
               return (
                 <Link
@@ -182,7 +214,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
         </aside>
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">{children}</main>
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+          {children}
+        </main>
       </div>
     </div>
   );

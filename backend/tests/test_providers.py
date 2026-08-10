@@ -3,13 +3,14 @@
 import pytest
 
 from app.services.providers.base import (
-    FREE_DEFAULTS, ProviderManager, ProviderRegistry,
+    FREE_DEFAULTS,
+    ProviderManager,
+    ProviderRegistry,
 )
 
 
 def test_registry_has_all_capabilities():
-    for capability in ("crawler", "search", "email_finder", "email_verifier",
-                       "people"):
+    for capability in ("crawler", "search", "email_finder", "email_verifier", "people"):
         providers = ProviderRegistry.for_capability(capability)
         assert providers, f"no provider registered for {capability}"
 
@@ -43,6 +44,7 @@ async def test_builtin_test_connections_pass(client):
 async def test_manager_resolves_free_defaults(client):
     ac, Session = client
     from tests.conftest import register_and_verify
+
     user = await register_and_verify(ac, Session)
     async with Session() as db:
         manager = ProviderManager(db, user["id"])
@@ -61,11 +63,16 @@ async def test_manager_resolves_free_defaults(client):
 async def test_api_key_storage_is_encrypted_and_masked(client):
     ac, Session = client
     from tests.conftest import register_and_verify
+
     user = await register_and_verify(ac, Session)
 
-    resp = await ac.put("/api/v1/providers/hunter", json={
-        "api_key": "super-secret-hunter-key-123", "enabled": True,
-    })
+    resp = await ac.put(
+        "/api/v1/providers/hunter",
+        json={
+            "api_key": "super-secret-hunter-key-123",
+            "enabled": True,
+        },
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert data["has_api_key"] is True
@@ -75,6 +82,7 @@ async def test_api_key_storage_is_encrypted_and_masked(client):
     # DB stores only ciphertext
     from app.models import APIProvider
     from sqlalchemy import select
+
     async with Session() as db:
         res = await db.execute(select(APIProvider))
         row = res.scalars().first()
@@ -94,6 +102,7 @@ async def test_api_key_storage_is_encrypted_and_masked(client):
 async def test_test_connection_no_key_reports_missing(client):
     ac, Session = client
     from tests.conftest import register_and_verify
+
     await register_and_verify(ac, Session)
     resp = await ac.post("/api/v1/providers/hunter/test", json={})
     assert resp.status_code == 200

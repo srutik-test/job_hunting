@@ -28,21 +28,27 @@ async def get_current_user(
 ) -> User:
     token = extract_token(request)
     if not token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                            detail="Not authenticated.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated."
+        )
     payload = decode_token(token, "access")
     if not payload or not payload.get("sub"):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                            detail="Invalid or expired session.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired session.",
+        )
 
     res = await db.execute(select(User).where(User.id == payload["sub"]))
     user = res.scalars().first()
     if user is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                            detail="Account no longer exists.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Account no longer exists."
+        )
     if user.account_status == "disabled":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                            detail="This account has been disabled.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This account has been disabled.",
+        )
     return user
 
 
@@ -52,6 +58,6 @@ async def get_verified_user(user: User = Depends(get_current_user)) -> User:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Please verify your email address before running searches. "
-                   "Use /auth/resend-verification to get a new link.",
+            "Use /auth/resend-verification to get a new link.",
         )
     return user

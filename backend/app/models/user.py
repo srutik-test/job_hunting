@@ -36,9 +36,15 @@ class User(Base):
     created_at = Column(DateTime, default=_now, nullable=False)
     last_login_at = Column(DateTime, nullable=True)
 
-    companies = relationship("Company", back_populates="user", cascade="all, delete-orphan")
-    searches = relationship("Search", back_populates="user", cascade="all, delete-orphan")
-    providers = relationship("APIProvider", back_populates="user", cascade="all, delete-orphan")
+    companies = relationship(
+        "Company", back_populates="user", cascade="all, delete-orphan"
+    )
+    searches = relationship(
+        "Search", back_populates="user", cascade="all, delete-orphan"
+    )
+    providers = relationship(
+        "APIProvider", back_populates="user", cascade="all, delete-orphan"
+    )
 
     def to_public(self) -> dict:
         return {
@@ -50,5 +56,7 @@ class User(Base):
             "is_email_verified": self.is_email_verified,
             "account_status": self.account_status,
             "created_at": self.created_at.isoformat() if self.created_at else None,
-            "last_login_at": self.last_login_at.isoformat() if self.last_login_at else None,
+            "last_login_at": (
+                self.last_login_at.isoformat() if self.last_login_at else None
+            ),
         }

@@ -4,10 +4,11 @@ import pytest
 
 from app.services.crawler.http_crawler import HttpCrawler, valid_email_candidate
 from app.services.crawler.page_classifier import (
-    classify_page_type, get_url_crawl_priority, is_internal_url,
+    classify_page_type,
+    get_url_crawl_priority,
+    is_internal_url,
 )
 from app.services.extraction.people import persons_from_jsonld, persons_from_text
-
 
 HTML = """
 <html><head>
@@ -48,8 +49,9 @@ def test_internal_url_domain_restriction():
 
 
 def test_crawl_priority():
-    assert get_url_crawl_priority("https://x.com/careers") > \
-        get_url_crawl_priority("https://x.com/blog/x")
+    assert get_url_crawl_priority("https://x.com/careers") > get_url_crawl_priority(
+        "https://x.com/blog/x"
+    )
     assert get_url_crawl_priority("https://x.com/logo.png") == -1
 
 
@@ -63,15 +65,16 @@ def test_valid_email_filtering():
 
 def test_full_page_parse_extracts_real_emails_only():
     crawler = HttpCrawler()
-    page = crawler._parse_page("https://alphatech.io/contact", 200, HTML,
-                               "alphatech.io")
+    page = crawler._parse_page(
+        "https://alphatech.io/contact", 200, HTML, "alphatech.io"
+    )
     emails = set(page.emails)
 
-    assert "hr@alphatech.io" in emails              # mailto extraction
+    assert "hr@alphatech.io" in emails  # mailto extraction
     assert "careers@alphatech.io" in emails
-    assert "jane.doe@alphatech.io" in emails        # JSON-LD extraction
+    assert "jane.doe@alphatech.io" in emails  # JSON-LD extraction
     assert "recruitment.team@alphatech.io" in emails  # obfuscation handling
-    assert "support@alphatech.io" in emails         # extracted but generic
+    assert "support@alphatech.io" in emails  # extracted but generic
 
     # LinkedIn captured without tracking params
     assert any("linkedin.com/in/janedoe" in u for u in page.linkedin_urls)
@@ -85,19 +88,24 @@ def test_full_page_parse_extracts_real_emails_only():
 @pytest.mark.asyncio
 async def test_person_identification_from_jsonld():
     crawler = HttpCrawler()
-    page = crawler._parse_page("https://alphatech.io/contact", 200, HTML,
-                               "alphatech.io")
+    page = crawler._parse_page(
+        "https://alphatech.io/contact", 200, HTML, "alphatech.io"
+    )
     persons = persons_from_jsonld(page.json_ld, page.url)
-    assert any(p.name == "Jane Doe"
-               and "Talent Acquisition" in p.job_title
-               and p.email == "jane.doe@alphatech.io" for p in persons)
+    assert any(
+        p.name == "Jane Doe"
+        and "Talent Acquisition" in p.job_title
+        and p.email == "jane.doe@alphatech.io"
+        for p in persons
+    )
 
 
 @pytest.mark.asyncio
 async def test_person_identification_from_text():
     people = persons_from_text(
         "Our leadership team: Priya Sharma - HR Manager. Contact her on LinkedIn.",
-        "AlphaTech", "https://alphatech.io/team",
+        "AlphaTech",
+        "https://alphatech.io/team",
         linkedin_urls=["https://linkedin.com/in/priya-sharma-aa"],
     )
     assert any(p.name == "Priya Sharma" for p in people)
@@ -108,11 +116,13 @@ async def test_person_identification_from_text():
 
 def test_linkedin_snippet_parser():
     from app.services.extraction.linkedin import parse_linkedin_snippet
+
     lead = parse_linkedin_snippet(
         "Jane Doe - Senior Technical Recruiter - AlphaTech | LinkedIn",
         "Ahmedabad, India · Senior Technical Recruiter · AlphaTech",
         "https://www.linkedin.com/in/jane-doe-a1b2c3?trk=xyz",
-        "AlphaTech", "DuckDuckGo",
+        "AlphaTech",
+        "DuckDuckGo",
     )
     assert lead is not None
     assert lead.name == "Jane Doe"
@@ -120,13 +130,24 @@ def test_linkedin_snippet_parser():
     assert "trk" not in lead.linkedin_url
 
     # non-HR profiles are ignored
-    assert parse_linkedin_snippet(
-        "John Smith - Software Engineer - AlphaTech | LinkedIn",
-        "Backend dev", "https://www.linkedin.com/in/john-smith",
-        "AlphaTech", "DuckDuckGo",
-    ) is None
+    assert (
+        parse_linkedin_snippet(
+            "John Smith - Software Engineer - AlphaTech | LinkedIn",
+            "Backend dev",
+            "https://www.linkedin.com/in/john-smith",
+            "AlphaTech",
+            "DuckDuckGo",
+        )
+        is None
+    )
     # non-LinkedIn URLs are ignored
-    assert parse_linkedin_snippet(
-        "Recruiter at AlphaTech", "", "https://alphatech.io/jobs",
-        "AlphaTech", "DuckDuckGo",
-    ) is None
+    assert (
+        parse_linkedin_snippet(
+            "Recruiter at AlphaTech",
+            "",
+            "https://alphatech.io/jobs",
+            "AlphaTech",
+            "DuckDuckGo",
+        )
+        is None
+    )

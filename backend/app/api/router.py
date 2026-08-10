@@ -3,7 +3,14 @@
 from fastapi import APIRouter
 
 from app.api.endpoints import (
-    auth, companies, contacts, dashboard, export, health, providers, searches,
+    auth,
+    companies,
+    contacts,
+    dashboard,
+    export,
+    health,
+    providers,
+    searches,
 )
 
 api_router = APIRouter()

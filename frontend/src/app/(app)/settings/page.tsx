@@ -2,7 +2,11 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  KeyRound, Loader2, MailCheck, ShieldCheck, User as UserIcon,
+  KeyRound,
+  Loader2,
+  MailCheck,
+  ShieldCheck,
+  User as UserIcon,
 } from "lucide-react";
 import { api } from "../../../lib/api";
 import type { Provider } from "../../../lib/types";
@@ -11,12 +15,18 @@ import ProviderCard from "../../../components/settings/ProviderCard";
 import { useAuth } from "../../../contexts/AuthContext";
 
 const CAPABILITY_ORDER = [
-  "crawler", "search", "email_finder", "email_verifier", "people",
+  "crawler",
+  "search",
+  "email_finder",
+  "email_verifier",
+  "people",
 ] as const;
 
 function AccountTab() {
   const { user, refresh } = useAuth();
-  const [msg, setMsg] = useState<{ message: string; devLink?: string } | null>(null);
+  const [msg, setMsg] = useState<{ message: string; devLink?: string } | null>(
+    null,
+  );
   const [busy, setBusy] = useState(false);
 
   if (!user) return null;
@@ -28,7 +38,9 @@ function AccountTab() {
       const res = await api.resendVerification();
       setMsg({ message: res.message, devLink: res.dev_link || undefined });
     } catch (err) {
-      setMsg({ message: err instanceof Error ? err.message : "Failed to resend." });
+      setMsg({
+        message: err instanceof Error ? err.message : "Failed to resend.",
+      });
     } finally {
       setBusy(false);
       refresh();
@@ -41,14 +53,20 @@ function AccountTab() {
         <div className="flex items-center space-x-3">
           {user.profile_picture ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={user.profile_picture} alt="avatar" className="h-12 w-12 rounded-full" />
+            <img
+              src={user.profile_picture}
+              alt="avatar"
+              className="h-12 w-12 rounded-full"
+            />
           ) : (
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-950 text-blue-600">
               <UserIcon className="h-6 w-6" />
             </div>
           )}
           <div>
-            <p className="font-bold text-slate-900 dark:text-white">{user.name}</p>
+            <p className="font-bold text-slate-900 dark:text-white">
+              {user.name}
+            </p>
             <p className="text-sm text-slate-500">{user.email}</p>
           </div>
         </div>
@@ -63,12 +81,16 @@ function AccountTab() {
           </div>
           <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3">
             <dt className="text-xs text-slate-400">Email verified</dt>
-            <dd className="font-semibold">{user.is_email_verified ? "Yes" : "No"}</dd>
+            <dd className="font-semibold">
+              {user.is_email_verified ? "Yes" : "No"}
+            </dd>
           </div>
           <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3">
             <dt className="text-xs text-slate-400">Member since</dt>
             <dd className="font-semibold">
-              {user.created_at ? new Date(user.created_at).toLocaleDateString() : "—"}
+              {user.created_at
+                ? new Date(user.created_at).toLocaleDateString()
+                : "—"}
             </dd>
           </div>
         </dl>
@@ -77,10 +99,14 @@ function AccountTab() {
           <div className="rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40 p-4 space-y-2">
             <p className="text-sm text-amber-700 dark:text-amber-400">
               <MailCheck className="inline h-4 w-4 mr-1" />
-              Your email is not verified. Searches stay disabled until you verify.
+              Your email is not verified. Searches stay disabled until you
+              verify.
             </p>
-            <button onClick={resend} disabled={busy}
-              className="rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-white hover:bg-amber-600 transition disabled:opacity-50">
+            <button
+              onClick={resend}
+              disabled={busy}
+              className="rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-white hover:bg-amber-600 transition disabled:opacity-50"
+            >
               {busy ? "Sending…" : "Resend verification email"}
             </button>
           </div>
@@ -89,7 +115,10 @@ function AccountTab() {
           <div className="rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 p-3 text-sm text-blue-700 dark:text-blue-300 space-y-1">
             <p>{msg.message}</p>
             {msg.devLink && (
-              <a href={msg.devLink} className="block text-xs text-blue-500 underline break-all">
+              <a
+                href={msg.devLink}
+                className="block text-xs text-blue-500 underline break-all"
+              >
                 {msg.devLink}
               </a>
             )}
@@ -119,7 +148,9 @@ function ProvidersTab() {
   const load = useCallback(async () => {
     try {
       setProviders(await api.listProviders());
-    } catch { /* ignore */ } finally {
+    } catch {
+      /* ignore */
+    } finally {
       setLoading(false);
     }
   }, []);
@@ -130,10 +161,15 @@ function ProvidersTab() {
 
   function updateOne(updated: Provider) {
     setProviders((prev) =>
-      prev.map((p) => (p.provider_key === updated.provider_key ? { ...p, ...updated } : p)),
+      prev.map((p) =>
+        p.provider_key === updated.provider_key ? { ...p, ...updated } : p,
+      ),
     );
     // also refresh silently to pick up new status timestamps
-    api.listProviders().then(setProviders).catch(() => {});
+    api
+      .listProviders()
+      .then(setProviders)
+      .catch(() => {});
   }
 
   if (loading) {
@@ -162,7 +198,11 @@ function ProvidersTab() {
             </h3>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {entries.map((p) => (
-                <ProviderCard key={p.provider_key} provider={p} onSaved={updateOne} />
+                <ProviderCard
+                  key={p.provider_key}
+                  provider={p}
+                  onSaved={updateOne}
+                />
               ))}
             </div>
           </section>
@@ -177,7 +217,9 @@ export default function SettingsPage() {
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">Settings</h1>
+        <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">
+          Settings
+        </h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
           Manage your account and the providers used during discovery.
         </p>
@@ -185,12 +227,15 @@ export default function SettingsPage() {
 
       <div className="flex space-x-2">
         {(["providers", "account"] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)}
+          <button
+            key={t}
+            onClick={() => setTab(t)}
             className={`rounded-lg px-4 py-2 text-xs font-bold transition capitalize ${
               tab === t
                 ? "bg-blue-600 text-white shadow"
                 : "bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
-            }`}>
+            }`}
+          >
             {t === "providers" ? "API Providers" : "Account"}
           </button>
         ))}

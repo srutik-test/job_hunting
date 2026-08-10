@@ -12,14 +12,26 @@ import httpx
 
 from app.core.config import settings
 from app.services.providers.base import (
-    CapabilityProvider, PersonLead, ProviderRegistry, TestResult, call_with_timing,
+    CapabilityProvider,
+    PersonLead,
+    ProviderRegistry,
+    TestResult,
+    call_with_timing,
 )
 
 HR_TITLES = [
-    "hr manager", "human resources manager", "head of hr", "hr director",
-    "recruiter", "talent acquisition manager", "talent acquisition specialist",
-    "talent partner", "recruitment manager", "hr business partner",
-    "people operations manager", "hr executive",
+    "hr manager",
+    "human resources manager",
+    "head of hr",
+    "hr director",
+    "recruiter",
+    "talent acquisition manager",
+    "talent acquisition specialist",
+    "talent partner",
+    "recruitment manager",
+    "hr business partner",
+    "people operations manager",
+    "hr executive",
 ]
 
 
@@ -41,22 +53,30 @@ class ApolloProvider(CapabilityProvider):
         if not key:
             return TestResult(ok=False, message="No API key configured.")
         resp, latency, err = await call_with_timing(
-            "GET", f"{self._base}/v1/auth/health",
+            "GET",
+            f"{self._base}/v1/auth/health",
             headers={"X-Api-Key": key},
         )
         if err:
-            return TestResult(ok=False, message=f"Request failed: {err}",
-                              latency_ms=latency)
+            return TestResult(
+                ok=False, message=f"Request failed: {err}", latency_ms=latency
+            )
         assert resp is not None
         if resp.status_code == 200 and resp.json().get("is_logged_in"):
-            return TestResult(ok=True, message="Connected to Apollo.io.",
-                              latency_ms=latency)
-        return TestResult(ok=False, message="Invalid Apollo API key.",
-                          latency_ms=latency)
+            return TestResult(
+                ok=True, message="Connected to Apollo.io.", latency_ms=latency
+            )
+        return TestResult(
+            ok=False, message="Invalid Apollo API key.", latency_ms=latency
+        )
 
-    async def find_people(self, company_domain: str, company_name: str = "",
-                          limit: int = 5,
-                          api_key: Optional[str] = None) -> List[PersonLead]:
+    async def find_people(
+        self,
+        company_domain: str,
+        company_name: str = "",
+        limit: int = 5,
+        api_key: Optional[str] = None,
+    ) -> List[PersonLead]:
         key = api_key or settings.APOLLO_API_KEY
         if not key or not company_domain:
             return []
@@ -82,18 +102,23 @@ class ApolloProvider(CapabilityProvider):
                         if not name or name.lower() in seen_names:
                             continue
                         seen_names.add(name.lower())
-                        emails = p.get("email")  # Apollo only returns emails within plan
-                        people.append(PersonLead(
-                            name=name,
-                            job_title=p.get("title") or title.title(),
-                            linkedin_url=p.get("linkedin_url"),
-                            email=(emails or "").lower() or None,
-                            email_verified=bool(
-                                emails and p.get("email_status") in
-                                ("verified", "guessed" if False else "verified")
-                            ),
-                            source_url=f"{self._base} people search",
-                        ))
+                        emails = p.get(
+                            "email"
+                        )  # Apollo only returns emails within plan
+                        people.append(
+                            PersonLead(
+                                name=name,
+                                job_title=p.get("title") or title.title(),
+                                linkedin_url=p.get("linkedin_url"),
+                                email=(emails or "").lower() or None,
+                                email_verified=bool(
+                                    emails
+                                    and p.get("email_status")
+                                    in ("verified", "guessed" if False else "verified")
+                                ),
+                                source_url=f"{self._base} people search",
+                            )
+                        )
                     if len(people) >= limit:
                         return people
         except Exception:

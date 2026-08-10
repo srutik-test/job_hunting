@@ -22,6 +22,7 @@ ProgressCallback = Optional[Callable[[Dict[str, Any]], Awaitable[Optional[bool]]
 def is_available() -> bool:
     try:
         import playwright  # noqa: F401
+
         return bool(settings.ENABLE_PLAYWRIGHT)
     except ImportError:
         return False
@@ -40,7 +41,9 @@ class BrowserCrawler:
         self.http = HttpCrawler(max_pages=self.max_pages)
 
     async def crawl_company(
-        self, base_url: str, company_name: str = "",
+        self,
+        base_url: str,
+        company_name: str = "",
         progress_callback: ProgressCallback = None,
     ) -> CrawlResult:
         from playwright.async_api import async_playwright  # local import
@@ -83,11 +86,13 @@ class BrowserCrawler:
                         if keep is False:
                             break
                     try:
-                        await page.goto(url, wait_until="networkidle",
-                                        timeout=int(self.http.timeout * 1000))
+                        await page.goto(
+                            url,
+                            wait_until="networkidle",
+                            timeout=int(self.http.timeout * 1000),
+                        )
                         html = await page.content()
-                        parsed = self.http._parse_page(url, 200, html,
-                                                       pre.base_domain)
+                        parsed = self.http._parse_page(url, 200, html, pre.base_domain)
                         pages.append(parsed)
                         html_pages.append(url)
                     except Exception as exc:  # pragma: no cover

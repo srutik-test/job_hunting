@@ -15,16 +15,37 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 HR_ROLE_KEYWORDS = [
-    "Head of HR", "Head of People", "HR Director", "HR Manager",
-    "Human Resources Manager", "Human Resources Director", "Human Resources",
-    "VP of People", "Chief People Officer", "Director of People",
-    "Talent Acquisition Manager", "Talent Acquisition Lead",
-    "Talent Acquisition Specialist", "Talent Acquisition", "Talent Partner",
-    "Senior Recruiter", "Technical Recruiter", "Lead Recruiter",
-    "Corporate Recruiter", "Recruiter", "Recruitment Manager",
-    "Recruitment Lead", "Recruitment Specialist", "Recruitment Coordinator",
-    "HR Executive", "HR Generalist", "HR Business Partner", "HRBP",
-    "People Operations Manager", "People Operations Lead", "People Operations",
+    "Head of HR",
+    "Head of People",
+    "HR Director",
+    "HR Manager",
+    "Human Resources Manager",
+    "Human Resources Director",
+    "Human Resources",
+    "VP of People",
+    "Chief People Officer",
+    "Director of People",
+    "Talent Acquisition Manager",
+    "Talent Acquisition Lead",
+    "Talent Acquisition Specialist",
+    "Talent Acquisition",
+    "Talent Partner",
+    "Senior Recruiter",
+    "Technical Recruiter",
+    "Lead Recruiter",
+    "Corporate Recruiter",
+    "Recruiter",
+    "Recruitment Manager",
+    "Recruitment Lead",
+    "Recruitment Specialist",
+    "Recruitment Coordinator",
+    "HR Executive",
+    "HR Generalist",
+    "HR Business Partner",
+    "HRBP",
+    "People Operations Manager",
+    "People Operations Lead",
+    "People Operations",
     "Hiring Manager",
 ]
 _ROLE_RE = re.compile("|".join(re.escape(r) for r in HR_ROLE_KEYWORDS), re.I)
@@ -37,20 +58,42 @@ class DiscoveredPerson(BaseModel):
     job_title: str
     source_url: str = ""
     linkedin_profile_url: Optional[str] = None
-    email: Optional[str] = None        # only when present on the page/near context
-    matched_via: str = "text"          # text | jsonld | email_context
+    email: Optional[str] = None  # only when present on the page/near context
+    matched_via: str = "text"  # text | jsonld | email_context
 
 
 _STOP_NAMES = {
-    "about us", "contact us", "our team", "read more", "learn more",
-    "apply now", "view all", "sign up", "log in", "get started",
+    "about us",
+    "contact us",
+    "our team",
+    "read more",
+    "learn more",
+    "apply now",
+    "view all",
+    "sign up",
+    "log in",
+    "get started",
 }
 # Words that signal a heading rather than a person when they appear inside a
 # candidate name (e.g. "Leadership Jane Doe" extracted from a header).
 _STOP_WORDS = {
-    "leadership", "team", "teams", "management", "about", "contact",
-    "careers", "our", "the", "welcome", "meet", "staff", "board", "join",
-    "company", "overview", "people",
+    "leadership",
+    "team",
+    "teams",
+    "management",
+    "about",
+    "contact",
+    "careers",
+    "our",
+    "the",
+    "welcome",
+    "meet",
+    "staff",
+    "board",
+    "join",
+    "company",
+    "overview",
+    "people",
 }
 
 
@@ -68,8 +111,9 @@ def _valid_name(name: str, company_name: str) -> bool:
     return 2 <= len(words) <= 4
 
 
-def persons_from_jsonld(json_ld: list, source_url: str,
-                        linkedin_urls: Optional[List[str]] = None) -> List[DiscoveredPerson]:
+def persons_from_jsonld(
+    json_ld: list, source_url: str, linkedin_urls: Optional[List[str]] = None
+) -> List[DiscoveredPerson]:
     people: List[DiscoveredPerson] = []
 
     def walk(node):
@@ -92,10 +136,16 @@ def persons_from_jsonld(json_ld: list, source_url: str,
                         for u in same_as:
                             if isinstance(u, str) and "linkedin.com/in/" in u:
                                 li = u
-                    people.append(DiscoveredPerson(
-                        name=name, job_title=title, source_url=source_url,
-                        linkedin_profile_url=li, email=email, matched_via="jsonld",
-                    ))
+                    people.append(
+                        DiscoveredPerson(
+                            name=name,
+                            job_title=title,
+                            source_url=source_url,
+                            linkedin_profile_url=li,
+                            email=email,
+                            matched_via="jsonld",
+                        )
+                    )
             for v in node.values():
                 if isinstance(v, (dict, list)):
                     walk(v)
@@ -107,8 +157,12 @@ def persons_from_jsonld(json_ld: list, source_url: str,
     return people
 
 
-def persons_from_text(text: str, company_name: str, source_url: str,
-                      linkedin_urls: Optional[List[str]] = None) -> List[DiscoveredPerson]:
+def persons_from_text(
+    text: str,
+    company_name: str,
+    source_url: str,
+    linkedin_urls: Optional[List[str]] = None,
+) -> List[DiscoveredPerson]:
     people: List[DiscoveredPerson] = []
     li_urls = linkedin_urls or []
     seen = set()
@@ -119,8 +173,11 @@ def persons_from_text(text: str, company_name: str, source_url: str,
     ]
     for pat in patterns:
         for m in pat.finditer(text):
-            name, role = (m.group(1), m.group(2)) if pat is patterns[0] else (
-                m.group(2), m.group(1))
+            name, role = (
+                (m.group(1), m.group(2))
+                if pat is patterns[0]
+                else (m.group(2), m.group(1))
+            )
             name = name.strip()
             role = role.strip()
             key = (name.lower(), role.lower())
@@ -130,12 +187,18 @@ def persons_from_text(text: str, company_name: str, source_url: str,
             li = None
             slug = name.lower().replace(" ", "-")
             for u in li_urls:
-                if "/in/" in u and (slug in u.lower() or
-                                    name.split()[0].lower() in u.lower()):
+                if "/in/" in u and (
+                    slug in u.lower() or name.split()[0].lower() in u.lower()
+                ):
                     li = u
                     break
-            people.append(DiscoveredPerson(
-                name=name, job_title=role, source_url=source_url,
-                linkedin_profile_url=li, matched_via="text",
-            ))
+            people.append(
+                DiscoveredPerson(
+                    name=name,
+                    job_title=role,
+                    source_url=source_url,
+                    linkedin_profile_url=li,
+                    matched_via="text",
+                )
+            )
     return people

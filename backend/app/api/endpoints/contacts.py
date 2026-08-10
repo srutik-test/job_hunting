@@ -29,7 +29,8 @@ async def list_contacts(
         .join(Company, Company.id == HRContact.company_id)
         .where(HRContact.user_id == user.id)
         .order_by(HRContact.created_at.desc())
-        .limit(limit).offset(offset)
+        .limit(limit)
+        .offset(offset)
     )
     if category:
         stmt = stmt.where(HRContact.contact_category == category)
@@ -38,7 +39,8 @@ async def list_contacts(
     if q:
         like = f"%{q}%"
         stmt = stmt.where(
-            (HRContact.email.ilike(like)) | (HRContact.name.ilike(like))
+            (HRContact.email.ilike(like))
+            | (HRContact.name.ilike(like))
             | (Company.name.ilike(like))
         )
     res = await db.execute(stmt)
