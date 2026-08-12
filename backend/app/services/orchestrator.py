@@ -31,12 +31,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models import Company, HRContact, Search, SearchLog
+from app.services.crawler.http_crawler import (
+    EMAIL_REGEX,
+    OBFUSCATED,
+    valid_email_candidate,
+)
 from app.services.evidence import score_for_email
 from app.services.extraction.classifier import (
     EmailCandidate,
     classify_email,
     is_hr_related,
-    is_verified_hr_email,
 )
 from app.services.extraction.people import persons_from_jsonld, persons_from_text
 from app.services.extraction.linkedin import parse_linkedin_snippet, LinkedInLead
@@ -97,6 +101,23 @@ class SearchOrchestrator:
         self.cancelled = False
         self.provider_manager = ProviderManager(db, search.user_id)
         self._persisted_emails: set[str] = set()
+
+    @staticmethod
+    def _emails_in_text(text: str) -> set[str]:
+        """Extract valid email candidates from free text without noise."""
+        if not text:
+            return set()
+        found: set[str] = set()
+        for em in EMAIL_REGEX.findall(text):
+            cleaned = em.strip().lower().rstrip(".,;:'\"()[]{}<>")
+            if valid_email_candidate(cleaned):
+                found.add(cleaned)
+        for match in OBFUSCATED.finditer(text):
+            u, d, t = match.groups()
+            cand = f"{u}@{d}.{t}".strip().lower().rstrip(".,;:'\"()[]{}<>")
+            if valid_email_candidate(cand):
+                found.add(cand)
+        return found
 
     async def _record_email(self, email: Optional[str]) -> bool:
         """Track persisted emails so the same address never duplicates."""
@@ -160,6 +181,25 @@ class SearchOrchestrator:
             return self.search
         base_domain = domain_of(base_url)
 
+        # Resolve and log active capability providers
+        crawler_p, _, crawler_o = await self.provider_manager.resolve("crawler")
+        search_p, _, search_o = await self.provider_manager.resolve("search")
+        verifier_p, verifier_k, verifier_o = await self.provider_manager.resolve("email_verifier")
+        finder_p, finder_k, finder_o = await self.provider_manager.resolve("email_finder")
+        people_p, people_k, people_o = await self.provider_manager.resolve("people")
+
+        manifest = [
+            f"Crawler: {crawler_p.display_name if crawler_p else 'None'}",
+            f"Search: {search_p.display_name if search_p else 'None'}",
+            f"Verifier: {verifier_p.display_name if verifier_p else 'None'}",
+        ]
+        if finder_p and (finder_k or finder_o == "database"):
+            manifest.append(f"Email Finder: {finder_p.display_name}")
+        if people_p and (people_k or people_o == "database"):
+            manifest.append(f"People Data: {people_p.display_name}")
+
+        await self.log(f"⚙ Discovery Engine Active Providers: {', '.join(manifest)}")
+
         try:
             crawl = await self._stage_crawl(base_url, base_domain)
             if await self.check_cancelled():
@@ -194,6 +234,13 @@ class SearchOrchestrator:
                 await self._persist_hr_evidence(
                     hr_evidence, verified_map, hunter_verified
                 )
+                # Query configured paid people/finder providers to enrich results with additional HR team leads
+                if people_p and (people_k or people_o == "database"):
+                    await self.log(f"→ Querying configured {people_p.display_name} for additional HR team members...")
+                    await self._stage_people_discovery(base_domain)
+                if finder_p and (finder_k or finder_o == "database"):
+                    await self.log(f"→ Querying configured {finder_p.display_name} for additional company addresses...")
+                    await self._stage_email_finder(base_domain)
                 await self._persist_people_from_pages(crawl)
                 await self._persist_company_emails(candidates, verified_map)
 
@@ -332,18 +379,26 @@ class SearchOrchestrator:
 
         result = list(candidates.values())
         self.search.emails_found = len(result)
-        await self.log(f"✓ {len(result)} email addresses extracted "
-                       f"(from real page content only)")
-        
+        await self.log(
+            f"✓ {len(result)} email addresses extracted "
+            f"(from real page content only)"
+        )
+
         # Log classification summary
         hr_count = sum(1 for c in result if is_hr_related(c))
         generic_count = sum(1 for c in result if c.is_generic)
-        await self.log(f"   Classification: {hr_count} HR-related, {generic_count} generic company emails", "info")
-        
+        await self.log(
+            f"   Classification: {hr_count} HR-related, {generic_count} generic company emails",
+            "info",
+        )
+
         for cand in result:
             label = cand.relation
-            await self.log(f"   • {cand.email} → {label} (page: "
-                           f"{cand.page_type}, context: {cand.context_strength})", "info")
+            await self.log(
+                f"   • {cand.email} → {label} (page: "
+                f"{cand.page_type}, context: {cand.context_strength})",
+                "info",
+            )
         return result
 
     # ---------------------------------------------------------------- stage 5
@@ -499,11 +554,11 @@ class SearchOrchestrator:
         if provider is None:
             await self.log("No email-discovery provider configured (skipping).")
             return
-        await self.log(f"Querying {provider.display_name} for {base_domain}")
+        await self.log(f"Querying {provider.display_name} ({origin}) for {base_domain}...")
         try:
             found = await provider.find_emails(base_domain, api_key=api_key)
         except Exception as exc:
-            await self.log(f"Email finder error: {exc}", "warning")
+            await self.log(f"{provider.display_name} error: {exc}", "warning")
             return
 
         count = 0
@@ -550,7 +605,7 @@ class SearchOrchestrator:
             count += 1
         if count:
             await self.log(
-                f"✓ {count} addresses returned by " f"{provider.display_name}",
+                f"✓ {count} addresses returned by {provider.display_name}",
                 "success",
             )
         else:
@@ -559,19 +614,19 @@ class SearchOrchestrator:
     # ---------------------------------------------------------------- stage 9
     async def _stage_people_discovery(self, base_domain: str) -> None:
         await self.set_progress("Professional/LinkedIn data providers", 88)
-        provider, api_key, _ = await self.provider_manager.resolve("people")
+        provider, api_key, origin = await self.provider_manager.resolve("people")
         if provider is None:
             await self.log("No professional-data provider configured (skipping).")
             return
         await self.log(
-            f"Querying {provider.display_name} for HR people at " f"{self.company.name}"
+            f"Querying {provider.display_name} ({origin}) for HR people at '{self.company.name}' ({base_domain})..."
         )
         try:
             people = await provider.find_people(
                 base_domain, company_name=self.company.name, api_key=api_key
             )
         except Exception as exc:
-            await self.log(f"People provider error: {exc}", "warning")
+            await self.log(f"{provider.display_name} error: {exc}", "warning")
             return
 
         for person in people:
@@ -609,9 +664,11 @@ class SearchOrchestrator:
             self.search.profiles_found += 1
         if people:
             await self.log(
-                f"✓ {len(people)} HR profile(s) from " f"{provider.display_name}",
+                f"✓ {len(people)} HR profile(s) from {provider.display_name}",
                 "success",
             )
+        else:
+            await self.log(f"{provider.display_name} returned 0 matching HR profiles.")
 
     # ---------------------------------------------------------------- persist
     async def _persist_hr_evidence(

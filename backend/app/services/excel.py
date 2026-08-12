@@ -22,18 +22,10 @@ from app.schemas.domain import CompanyInput
 
 EXPORT_HEADERS = [
     "Company Name",
-    "Website",
+    "HR Mails",
+    "Company Website",
+    "LinkedIn URL",
     "Location",
-    "HR Name",
-    "Designation",
-    "HR Email",
-    "LinkedIn Profile",
-    "Source",
-    "Source URL",
-    "Discovery Method",
-    "Verification Status",
-    "Confidence",
-    "Date Found",
 ]
 
 _HEADER_FILL = PatternFill("solid", fgColor="1E3A8A")
@@ -55,27 +47,20 @@ def build_results_workbook(rows: List[dict]) -> bytes:
     for r, row in enumerate(rows, start=2):
         email = row.get("email")
         ws.cell(row=r, column=1, value=row.get("company_name", ""))
-        ws.cell(row=r, column=2, value=row.get("website", ""))
-        ws.cell(row=r, column=3, value=row.get("location", ""))
-        ws.cell(row=r, column=4, value=row.get("name") or "-")
-        ws.cell(row=r, column=5, value=row.get("designation") or "-")
-        ws.cell(row=r, column=6, value=email if email else "No email evidence")
-        ws.cell(row=r, column=7, value=row.get("linkedin_url") or "-")
-        ws.cell(row=r, column=8, value=row.get("source_label", ""))
-        ws.cell(row=r, column=9, value=row.get("source_url") or "-")
-        ws.cell(row=r, column=10, value=row.get("discovery_method", ""))
-        ws.cell(row=r, column=11, value=row.get("verification_status", ""))
-        ws.cell(row=r, column=12, value=f"{row.get('confidence_score', 0)}%")
-        ws.cell(row=r, column=13, value=row.get("created_at", ""))
+        ws.cell(row=r, column=2, value=email if email else "No email evidence")
+        ws.cell(row=r, column=3, value=row.get("website", ""))
+        ws.cell(row=r, column=4, value=row.get("linkedin_url") or "-")
+        ws.cell(row=r, column=5, value=row.get("location", ""))
 
     for idx, header in enumerate(EXPORT_HEADERS, start=1):
-        width = max(len(header) + 4, 16)
+        width = max(len(header) + 6, 22)
         ws.column_dimensions[get_column_letter(idx)].width = width
     ws.freeze_panes = "A2"
 
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
+
 
 
 # --------------------------------------------------------------- import parsing

@@ -22,6 +22,7 @@ import {
 import { clsx } from "clsx";
 import { useAuth } from "../../contexts/AuthContext";
 import { sampleTemplateUrl } from "../../lib/api";
+import Logo from "../brand/Logo";
 
 const NAV = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -82,24 +83,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen">
       <header className="sticky top-0 z-40 w-full border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center space-x-2.5 group">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white shadow-lg shadow-blue-500/25 group-hover:scale-105 transition-transform">
-              <Building2 className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="font-bold text-slate-900 dark:text-white tracking-tight text-lg">
-                  HR Contact Intelligence
-                </span>
-                <span className="inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-semibold text-blue-600 dark:text-blue-400 ring-1 ring-inset ring-blue-500/20">
-                  v2.0
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">
-                Evidence-first HR & Recruiter Discovery
-              </p>
-            </div>
-          </Link>
+          <div className="flex items-center space-x-3">
+            <Logo size="md" />
+            <span className="hidden sm:inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-600 dark:text-blue-400 ring-1 ring-inset ring-blue-500/20">
+              v2.0
+            </span>
+          </div>
 
           <div className="flex items-center space-x-3">
             <a

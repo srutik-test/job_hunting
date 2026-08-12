@@ -53,10 +53,22 @@ def create_access_token(user_id: str) -> str:
     return _create_token(user_id, "access", settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
 
+def create_registration_token(
+    name: str, email: str, password_hash_str: str
+) -> str:
+    return _create_token(
+        subject=email,
+        purpose="verify-registration",
+        expires_minutes=settings.EMAIL_VERIFICATION_EXPIRE_MINUTES,
+        extra={"name": name, "hp": password_hash_str},
+    )
+
+
 def create_email_verification_token(user_id: str) -> str:
     return _create_token(
         user_id, "verify-email", settings.EMAIL_VERIFICATION_EXPIRE_MINUTES
     )
+
 
 
 def create_password_reset_token(user_id: str) -> str:

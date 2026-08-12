@@ -10,6 +10,7 @@ Guarantees:
   fall back to a browser-based provider.
 """
 
+import html as html_lib
 import json
 import re
 import time
@@ -30,7 +31,7 @@ from app.services.crawler.sitemap import SitemapParser
 
 EMAIL_REGEX = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", re.I)
 OBFUSCATED = re.compile(
-    r"([a-zA-Z0-9_.+-]+)\s*(?:\[at\]|\(at\)|\{at\}|\s+at\s+|\s+AT\s+)"
+    r"([a-zA-Z0-9_.+-]+)\s*(?:\[at\]|\(at\)|\{at\}|\s+at\s+|\s+AT\s+|&#64;|&commat;)"
     r"\s*([a-zA-Z0-9-]+)\s*(?:\[dot\]|\(dot\)|\{dot\}|\s+dot\s+|\.)\s*([a-zA-Z0-9-.]+)",
     re.I,
 )
@@ -54,15 +55,62 @@ BLOCK_MARKERS = [
     "perimeterx",
 ]
 
+IGNORED_DOMAINS = {
+    "example.com",
+    "example.org",
+    "example.net",
+    "domain.com",
+    "email.com",
+    "sample.com",
+    "test.com",
+    "yourcompany.com",
+    "company.com",
+    "sentry.io",
+    "sentry.wixpress.com",
+    "wixpress.com",
+    "github.com",
+    "schema.org",
+    "w3.org",
+    "cloudflare.com",
+    "doubleclick.net",
+    "fontawesome.com",
+    "reactjs.org",
+    "googleapis.com",
+    "gravatar.com",
+    "wordpress.org",
+    "polyfill.io",
+    "intercom.io",
+    "google-analytics.com",
+    "googletagmanager.com",
+    "scale.business",
+    "scale.frameworks",
+}
+
+VALID_TLD_REGEX = re.compile(r"^[a-zA-Z]{2,24}$")
+
 ProgressCallback = Optional[Callable[[Dict[str, Any]], Awaitable[Optional[bool]]]]
-# callback receives {current_page, pages_crawled, emails_count}; if it returns
-# False the crawl is cancelled cooperatively.
 
 
-def valid_email_candidate(email: str) -> bool:
-    """Reject asset files, templates and obviously invalid matches."""
+def decode_cloudflare_email(cfemail: str) -> Optional[str]:
+    """Decode Cloudflare XOR-encoded email from data-cfemail attribute."""
+    try:
+        cfemail = cfemail.strip()
+        if len(cfemail) < 4 or len(cfemail) % 2 != 0:
+            return None
+        k = int(cfemail[:2], 16)
+        email = "".join(
+            chr(int(cfemail[i : i + 2], 16) ^ k) for i in range(2, len(cfemail), 2)
+        )
+        return email.strip().lower()
+    except Exception:
+        return None
+
+
+def valid_email_candidate(email: str, base_domain: Optional[str] = None) -> bool:
+    """Reject asset files, templates, CSS/JS artifacts, and noise domains."""
     if not email or len(email) < 6 or len(email) > 100:
         return False
+    email = email.strip().lower().rstrip(".,;:'\"()[]{}<>")
     bad_endings = (
         ".png",
         ".jpg",
@@ -80,26 +128,43 @@ def valid_email_candidate(email: str) -> bool:
         ".ico",
         ".pdf",
         ".html",
+        ".json",
+        ".xml",
+        ".map",
+        ".zip",
+        ".gz",
+        ".tar",
     )
     if email.endswith(bad_endings):
         return False
     parts = email.split("@")
-    if len(parts) != 2 or "." not in parts[1]:
+    if len(parts) != 2:
         return False
-    if parts[1] in (
-        "example.com",
-        "example.org",
-        "domain.com",
-        "email.com",
-        "sample.com",
-        "test.com",
-        "sentry.io",
-        "sentry.wixpress.com",
+    local, domain = parts[0].strip(), parts[1].strip()
+    if not local or not domain or "." not in domain:
+        return False
+
+    # Must have a valid alphabetic TLD
+    tld = domain.split(".")[-1]
+    if not VALID_TLD_REGEX.match(tld):
+        return False
+
+    # Filter known noise / library domains
+    if domain in IGNORED_DOMAINS or any(
+        domain.endswith("." + d) for d in IGNORED_DOMAINS
     ):
         return False
-    # hash-like local parts on sentry noise domains
-    if re.fullmatch(r"u?[0-9a-f]{5,}", parts[0]) and parts[1].endswith("sentry.io"):
+
+    # Reject hash-like local parts on analytics/logging domains
+    if re.fullmatch(r"u?[0-9a-f]{5,}", local) and (
+        "sentry" in domain or "wix" in domain or "log" in domain
+    ):
         return False
+
+    # Check for placeholder template strings
+    if local in ("your-email", "youremail", "email-address", "name@domain"):
+        return False
+
     return True
 
 
@@ -276,7 +341,7 @@ class HttpCrawler:
                 all_emails.update(page.emails)
                 all_li.update(page.linkedin_urls)
 
-                # secondary internal links from the page (already-pruned)
+                # secondary internal links from the page
                 for link in page.links:
                     if link not in visited and is_internal_url(base_domain, link):
                         prio = get_url_crawl_priority(link)
@@ -348,12 +413,29 @@ class HttpCrawler:
         emails: Set[str] = set()
         contexts: List[Dict[str, str]] = []
 
-        # 1) mailto: links (highest signal) — capture nearby context
         if soup:
+            # 1) Cloudflare email protection decoding (data-cfemail attribute)
+            for tag in soup.select("[data-cfemail], .__cf_email__"):
+                cf = tag.get("data-cfemail") or tag.get("data-email")
+                if cf:
+                    decoded = decode_cloudflare_email(cf)
+                    if decoded and valid_email_candidate(decoded, base_domain):
+                        emails.add(decoded)
+                        parent_text = " ".join(
+                            (
+                                tag.parent.get_text(" ", strip=True)
+                                if tag.parent
+                                else tag.get_text(" ", strip=True)
+                            ).split()
+                        )[:400]
+                        contexts.append({"email": decoded, "context": parent_text})
+
+            # 2) mailto: links (highest signal) — capture nearby context
             for a in soup.select('a[href^="mailto:"]'):
                 href = a.get("href", "")
                 raw = href.replace("mailto:", "").split("?")[0].strip().lower()
-                if valid_email_candidate(raw):
+                raw = html_lib.unescape(raw)
+                if valid_email_candidate(raw, base_domain):
                     emails.add(raw)
                     parent_text = " ".join(
                         (
@@ -364,35 +446,55 @@ class HttpCrawler:
                     )[:400]
                     contexts.append({"email": raw, "context": parent_text})
 
-        # 2) raw HTML + visible text regex (catches cfemail-free text; also manifests etc.)
-        visible_text = ""
-        if soup:
-            for junk in soup(["script", "style", "noscript"]):
-                junk.decompose()
-            visible_text = soup.get_text(" ", strip=True)
-
-        for em in EMAIL_REGEX.findall(html):
-            cleaned = em.strip().lower().rstrip(".,;:'\"")
-            if valid_email_candidate(cleaned):
-                emails.add(cleaned)
-
-        for match in OBFUSCATED.finditer(visible_text):
-            u, d, t = match.groups()
-            cand = f"{u}@{d}.{t}".strip().lower()
-            if valid_email_candidate(cand):
-                emails.add(cand)
-
-        # 3) attribute-based (data-email, obfuscation schemes)
-        for raw in EMAIL_ATTR_REGEX.findall(html):
-            cand = raw.replace("[at]", "@").replace("[dot]", ".").strip().lower()
-            for em in EMAIL_REGEX.findall(cand):
-                if valid_email_candidate(em):
-                    emails.add(em)
+            # 3) Attribute-based (data-email, data-mail, data-address)
+            for tag in (
+                soup.find_all(attrs={"data-email": True})
+                + soup.find_all(attrs={"data-mail": True})
+                + soup.find_all(attrs={"data-address": True})
+            ):
+                val = (
+                    tag.get("data-email")
+                    or tag.get("data-mail")
+                    or tag.get("data-address")
+                    or ""
+                )
+                val = (
+                    html_lib.unescape(val)
+                    .replace("[at]", "@")
+                    .replace("[dot]", ".")
+                    .strip()
+                    .lower()
+                )
+                if valid_email_candidate(val, base_domain):
+                    emails.add(val)
+                    parent_text = " ".join(tag.get_text(" ", strip=True).split())[:400]
+                    contexts.append({"email": val, "context": parent_text})
 
         # 4) JSON-LD Person/Organization emails
-        self._jsonld_emails(json_ld, emails)
+        self._jsonld_emails(json_ld, emails, base_domain)
 
-        # text context for emails found via raw regex (rough window)
+        # 5) Clean visible text extraction (after stripping script, style, svg, noscript, etc.)
+        visible_text = ""
+        if soup:
+            for junk in soup(
+                ["script", "style", "noscript", "svg", "canvas", "template"]
+            ):
+                junk.decompose()
+            visible_text = html_lib.unescape(soup.get_text(" ", strip=True))
+
+            # Regex on cleaned visible text only (never raw HTML minified code)
+            for em in EMAIL_REGEX.findall(visible_text):
+                cleaned = em.strip().lower().rstrip(".,;:'\"()[]{}<>")
+                if valid_email_candidate(cleaned, base_domain):
+                    emails.add(cleaned)
+
+            for match in OBFUSCATED.finditer(visible_text):
+                u, d, t = match.groups()
+                cand = f"{u}@{d}.{t}".strip().lower().rstrip(".,;:'\"()[]{}<>")
+                if valid_email_candidate(cand, base_domain):
+                    emails.add(cand)
+
+        # text context for emails found via regex (window search in visible text)
         for em in emails - {c["email"] for c in contexts}:
             idx = visible_text.lower().find(em)
             window = ""
@@ -434,15 +536,17 @@ class HttpCrawler:
         )
 
     @staticmethod
-    def _jsonld_emails(data: Any, out: Set[str]) -> None:
+    def _jsonld_emails(
+        data: Any, out: Set[str], base_domain: Optional[str] = None
+    ) -> None:
         if isinstance(data, dict):
             for k, v in data.items():
                 if k.lower() == "email" and isinstance(v, str):
                     cand = v.strip().lower()
-                    if valid_email_candidate(cand):
+                    if valid_email_candidate(cand, base_domain):
                         out.add(cand)
                 elif isinstance(v, (dict, list)):
-                    HttpCrawler._jsonld_emails(v, out)
+                    HttpCrawler._jsonld_emails(v, out, base_domain)
         elif isinstance(data, list):
             for item in data:
-                HttpCrawler._jsonld_emails(item, out)
+                HttpCrawler._jsonld_emails(item, out, base_domain)

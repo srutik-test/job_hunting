@@ -87,6 +87,8 @@ class FirecrawlProvider(CapabilityProvider):
         # Reuse the domain discovery of the light crawler to find target URLs,
         # then render each through Firecrawl.
         pre = await http.crawl_company(base_url, company_name, None)
+        if not key:
+            return pre
         if not base_url.startswith(("http://", "https://")):
             base_url = "https://" + base_url
         base_url = base_url.rstrip("/")

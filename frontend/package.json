@@ -8,7 +8,6 @@
     "start": "next start -p 3000",
     "lint": "next lint",
     "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx}\""
-    
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.3.3",
@@ -16,17 +15,14 @@
     "clsx": "^2.1.1",
     "lucide-react": "^1.30.0",
     "next": "^16.3.0",
-    "papaparse": "^5.5.4",
     "postcss": "^8.5.26",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwind-merge": "^3.6.0",
-    "tailwindcss": "^4.3.3",
-    "xlsx": "^0.18.5"
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "@types/papaparse": "^5.5.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "typescript": "^5.7.0"

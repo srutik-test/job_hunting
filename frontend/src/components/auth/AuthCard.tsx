@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { Building2, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
+import { LogoIcon } from "../brand/Logo";
 
 export default function AuthCard({
   title,
@@ -15,8 +16,8 @@ export default function AuthCard({
   return (
     <div className="w-full max-w-md space-y-6">
       <div className="text-center space-y-3">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white shadow-lg shadow-blue-500/25">
-          <Building2 className="h-7 w-7" />
+        <div className="inline-flex justify-center">
+          <LogoIcon className="h-14 w-14" />
         </div>
         <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
           {title}
@@ -33,7 +34,7 @@ export default function AuthCard({
       </div>
 
       <p className="flex items-center justify-center space-x-1.5 text-xs text-slate-400 dark:text-slate-500">
-        <ShieldCheck className="h-3.5 w-3.5" />
+        <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
         <span>Evidence-first results – no generated or guessed emails.</span>
       </p>
     </div>

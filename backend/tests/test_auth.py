@@ -147,7 +147,7 @@ async def test_protected_routes_require_auth(client):
 @pytest.mark.asyncio
 async def test_verification_required_for_searches(client):
     ac, Session = client
-    # register but do NOT verify
+    # register but do NOT verify yet
     resp = await ac.post(
         "/api/v1/auth/register",
         json={
@@ -157,19 +157,80 @@ async def test_verification_required_for_searches(client):
         },
     )
     assert resp.status_code == 201
-    resp = await ac.post(
+    dev_link = resp.json().get("dev_link")
+    assert dev_link is not None
+    token = dev_link.split("token=")[1]
+
+    # User must NOT exist in the database yet
+    from app.models import User
+    from sqlalchemy import select
+
+    async with Session() as db:
+        res = await db.execute(
+            select(User).where(User.email == "unverified@example.com")
+        )
+        assert res.scalars().first() is None, "User should NOT be stored in DB before email verification"
+
+    # Attempting to log in before verification must fail
+    resp_login = await ac.post(
         "/api/v1/auth/login",
         json={
             "email": "unverified@example.com",
             "password": "Sup3rSecret!",
         },
     )
-    assert resp.status_code == 200
+    assert resp_login.status_code in (401, 403)
 
-    resp = await ac.post(
-        "/api/v1/searches",
+    # Now verify email using token
+    resp_verify = await ac.post(
+        "/api/v1/auth/verify-email",
+        json={"token": token},
+    )
+    assert resp_verify.status_code == 200
+
+    # User MUST now exist in the database and be verified
+    async with Session() as db:
+        res = await db.execute(
+            select(User).where(User.email == "unverified@example.com")
+        )
+        user_in_db = res.scalars().first()
+        assert user_in_db is not None
+        assert user_in_db.is_email_verified is True
+        assert user_in_db.account_status == "active"
+
+    # Now login succeeds
+    resp_login_after = await ac.post(
+        "/api/v1/auth/login",
         json={
-            "companies": [{"name": "Acme", "website": "https://acme.example.com"}],
+            "email": "unverified@example.com",
+            "password": "Sup3rSecret!",
         },
     )
-    assert resp.status_code == 403
+    assert resp_login_after.status_code == 200
+
+
+
+
+@pytest.mark.asyncio
+async def test_update_profile(client):
+    ac, Session = client
+    await register_and_verify(ac, Session)
+
+    # Update name and avatar
+    resp = await ac.put(
+        "/api/v1/auth/me",
+        json={
+            "name": "Alex Smith",
+            "profile_picture": "https://example.com/alex.jpg",
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["name"] == "Alex Smith"
+    assert data["profile_picture"] == "https://example.com/alex.jpg"
+
+    # Fetch me to confirm persistence
+    me = await ac.get("/api/v1/auth/me")
+    assert me.status_code == 200
+    assert me.json()["name"] == "Alex Smith"
+    assert me.json()["profile_picture"] == "https://example.com/alex.jpg"

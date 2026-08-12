@@ -10,13 +10,11 @@ export type SearchStatus =
   | "failed"
   | "cancelled";
 
-export type VerificationStatus = "verified" | "partially_verified" | "unverified";
+export type VerificationStatus =
+  "verified" | "partially_verified" | "unverified";
 
 export type ContactCategory =
-  | "verified_hr"
-  | "possible_hr"
-  | "company_email"
-  | "linkedin";
+  "verified_hr" | "possible_hr" | "company_email" | "linkedin";
 
 export interface Company {
   id: string;
@@ -30,7 +28,7 @@ export interface Company {
 
 export interface Search {
   id: string;
-  user_id: string;
+  user_id?: string;
   company_id: string;
   company?: Company;
   status: SearchStatus;
@@ -39,9 +37,9 @@ export interface Search {
   pages_crawled: number;
   emails_found: number;
   profiles_found: number;
-  summary?: string;
-  error_message?: string;
-  discovery_method?: string;
+  summary?: string | null;
+  error_message?: string | null;
+  discovery_method?: string | null;
   duration_seconds?: number;
   created_at?: string;
   started_at?: string;
@@ -50,8 +48,8 @@ export interface Search {
 
 export interface SearchLog {
   id: string;
-  search_id: string;
-  level: "info" | "success" | "warning" | "error";
+  search_id?: string;
+  level: "info" | "success" | "warning" | "error" | string;
   message: string;
   created_at?: string;
 }
@@ -60,13 +58,13 @@ export interface Contact {
   id: string;
   search_id: string;
   company_id: string;
-  name?: string;
-  designation?: string;
-  email?: string;
-  linkedin_url?: string;
+  name?: string | null;
+  designation?: string | null;
+  email?: string | null;
+  linkedin_url?: string | null;
   source_type: string;
-  source_url?: string;
-  provider_name?: string;
+  source_url?: string | null;
+  provider_name?: string | null;
   verification_status: VerificationStatus;
   confidence_score: number;
   contact_category: ContactCategory;
@@ -74,56 +72,68 @@ export interface Contact {
   created_at?: string;
   // Denormalized for display convenience
   company_name?: string;
+  company_website?: string;
+  company_location?: string;
 }
 
 export interface DashboardStats {
   total_companies: number;
+  total_searches: number;
+  searches_pending: number;
+  searches_processing: number;
+  searches_completed: number;
+  searches_failed: number;
+  searches_no_results: number;
+  total_contacts: number;
   verified_contacts: number;
   possible_contacts: number;
   company_emails: number;
   linkedin_profiles: number;
-  total_searches: number;
-  searches_no_results: number;
-  searches_failed: number;
 }
 
 export interface User {
   id: string;
   email: string;
-  name?: string;
+  name: string;
   profile_picture?: string | null;
-  auth_provider?: string;
-  account_status?: string;
-  is_email_verified?: boolean;
+  auth_provider: string;
+  account_status: string;
+  is_email_verified: boolean;
   created_at?: string;
+  last_login_at?: string;
 }
 
 export interface Provider {
-  id: string;
-  name: string;
-  key: string;
-  provider_key?: string;
+  id?: string;
   capability: string;
-  api_key_configured: boolean;
-  api_key_hint?: string;
+  provider_key: string;
+  display_name: string;
+  is_free: boolean;
+  configured_via_env?: boolean;
+  api_key_masked?: string | null;
+  has_api_key?: boolean;
   enabled: boolean;
+  status: string;
+  status_detail?: string | null;
+  last_tested_at?: string | null;
+  signup_url?: string | null;
   config?: Record<string, string>;
 }
 
 export interface ProviderTestResult {
-  success: boolean;
+  ok: boolean;
+  provider_key: string;
   message: string;
+  latency_ms: number;
   details?: Record<string, unknown>;
 }
 
 export interface CaptchaChallenge {
-  id: string;
-  image_url: string;
-  expires_at?: string;
-  provider?: string;
-  site_key?: string;
-  question?: string;
   enabled?: boolean;
+  provider: string;
+  site_key?: string | null;
+  captcha_id?: string | null;
+  question?: string | null;
 }
 
 // UI label helpers

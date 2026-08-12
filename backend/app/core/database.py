@@ -52,6 +52,28 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 
+def _sync_sqlite_schema(sync_conn) -> None:
+    """Ensure existing SQLite tables have all required columns defined in models."""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(sync_conn)
+    tables = inspector.get_table_names()
+    if "companies" in tables:
+        cols = {c["name"] for c in inspector.get_columns("companies")}
+        if "user_id" not in cols:
+            sync_conn.execute(
+                text("ALTER TABLE companies ADD COLUMN user_id VARCHAR(36) DEFAULT ''")
+            )
+        if "industry" not in cols:
+            sync_conn.execute(
+                text("ALTER TABLE companies ADD COLUMN industry VARCHAR(255) DEFAULT ''")
+            )
+        if "meta" not in cols:
+            sync_conn.execute(
+                text("ALTER TABLE companies ADD COLUMN meta TEXT DEFAULT '{}'")
+            )
+
+
 async def init_db() -> None:
     """
     Create tables when missing (used for the SQLite dev path and for tests).
@@ -61,3 +83,6 @@ async def init_db() -> None:
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        if settings.DATABASE_URL.startswith("sqlite"):
+            await conn.run_sync(_sync_sqlite_schema)
+

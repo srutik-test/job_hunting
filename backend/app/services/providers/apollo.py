@@ -7,6 +7,7 @@ surfaced; nothing is fabricated.
 """
 
 from typing import List, Optional
+import logging
 
 import httpx
 
@@ -19,19 +20,22 @@ from app.services.providers.base import (
     call_with_timing,
 )
 
+logger = logging.getLogger("platform.providers.apollo")
+
 HR_TITLES = [
-    "hr manager",
-    "human resources manager",
-    "head of hr",
-    "hr director",
-    "recruiter",
-    "talent acquisition manager",
-    "talent acquisition specialist",
-    "talent partner",
-    "recruitment manager",
-    "hr business partner",
-    "people operations manager",
-    "hr executive",
+    "HR Manager",
+    "Human Resources Manager",
+    "Head of HR",
+    "HR Director",
+    "Recruiter",
+    "Talent Acquisition Manager",
+    "Talent Acquisition Specialist",
+    "Talent Partner",
+    "Recruitment Manager",
+    "HR Business Partner",
+    "People Operations Manager",
+    "HR Executive",
+    "Technical Recruiter",
 ]
 
 
@@ -74,55 +78,65 @@ class ApolloProvider(CapabilityProvider):
         self,
         company_domain: str,
         company_name: str = "",
-        limit: int = 5,
+        limit: int = 10,
         api_key: Optional[str] = None,
     ) -> List[PersonLead]:
         key = api_key or settings.APOLLO_API_KEY
         if not key or not company_domain:
             return []
+        
+        domain_clean = company_domain.lower().strip().removeprefix("www.")
         people: List[PersonLead] = []
         seen_names = set()
+
         try:
             async with httpx.AsyncClient(timeout=25) as client:
-                for title in HR_TITLES[:4]:
-                    resp = await client.post(
-                        f"{self._base}/v1/mixed_people/search",
-                        headers={"X-Api-Key": key, "Content-Type": "application/json"},
-                        json={
-                            "person_titles": [title],
-                            "q_organization_domains": company_domain,
-                            "per_page": 3,
-                            "page": 1,
-                        },
+                payload = {
+                    "person_titles": HR_TITLES,
+                    "q_organization_domains": domain_clean,
+                    "per_page": limit,
+                    "page": 1,
+                }
+                resp = await client.post(
+                    f"{self._base}/v1/mixed_people/search",
+                    headers={"X-Api-Key": key, "Content-Type": "application/json"},
+                    json=payload,
+                )
+                if resp.status_code != 200:
+                    logger.warning(
+                        "Apollo search returned HTTP %s for domain %s: %s",
+                        resp.status_code,
+                        domain_clean,
+                        resp.text[:300],
                     )
-                    if resp.status_code != 200:
-                        break
-                    for p in resp.json().get("people", []):
-                        name = p.get("name") or ""
-                        if not name or name.lower() in seen_names:
-                            continue
-                        seen_names.add(name.lower())
-                        emails = p.get(
-                            "email"
-                        )  # Apollo only returns emails within plan
-                        people.append(
-                            PersonLead(
-                                name=name,
-                                job_title=p.get("title") or title.title(),
-                                linkedin_url=p.get("linkedin_url"),
-                                email=(emails or "").lower() or None,
-                                email_verified=bool(
-                                    emails
-                                    and p.get("email_status")
-                                    in ("verified", "guessed" if False else "verified")
-                                ),
-                                source_url=f"{self._base} people search",
-                            )
+                    return []
+
+                data = resp.json()
+                raw_people = data.get("people", [])
+                for p in raw_people:
+                    name = p.get("name") or f"{p.get('first_name', '')} {p.get('last_name', '')}".strip()
+                    if not name or name.lower() in seen_names:
+                        continue
+                    seen_names.add(name.lower())
+                    email = (p.get("email") or "").strip().lower() or None
+                    people.append(
+                        PersonLead(
+                            name=name,
+                            job_title=p.get("title") or "HR Professional",
+                            linkedin_url=p.get("linkedin_url"),
+                            email=email,
+                            email_verified=bool(
+                                email and p.get("email_status") in ("verified", "extrapolated")
+                            ),
+                            source_url=f"https://app.apollo.io/#/people?qOrganizationDomain={domain_clean}",
                         )
+                    )
                     if len(people) >= limit:
-                        return people
-        except Exception:
+                        break
+        except Exception as exc:
+            logger.exception("Error querying Apollo for domain %s: %s", domain_clean, exc)
             return people
+
         return people
 
 

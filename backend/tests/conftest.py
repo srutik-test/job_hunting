@@ -21,13 +21,19 @@ os.environ["RATE_LIMIT_SEARCH"] = "10000/minute"
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.core.database import Base  # noqa: E402
+from app.core.config import settings
+settings.SMTP_HOST = None
+settings.SMTP_FROM = "no-reply@hr-platform.local"
+settings.DEBUG = True
+
+from app.core.database import Base, get_db  # noqa: E402
 from app import models  # noqa: F401, E402
 from app.main import app  # noqa: E402
-from app.core.database import get_db  # noqa: E402
 import app.services.worker as worker_module  # noqa: E402
 
 TEST_EMAIL = "tester@example.com"
+
+
 TEST_PASSWORD = "Sup3rSecret!"
 
 
@@ -76,7 +82,7 @@ async def register_and_verify(
     password: str = TEST_PASSWORD,
     name: str = "Test User",
 ) -> dict:
-    """Register a user, mark the email verified in the DB, and log in."""
+    """Register a user, verify via token, and log in."""
     resp = await client.post(
         "/api/v1/auth/register",
         json={
@@ -86,20 +92,15 @@ async def register_and_verify(
         },
     )
     assert resp.status_code == 201, resp.text
+    dev_link = resp.json().get("dev_link")
+    assert dev_link is not None, "dev_link must be present in dev/test mode"
+    token = dev_link.split("token=")[1]
 
-    from app.models import User
-    from sqlalchemy import select
-
-    async with Session() as db:
-        res = await db.execute(select(User).where(User.email == email))
-        user = res.scalars().one()
-        user.is_email_verified = True
-        user.account_status = "active"
-        await db.commit()
-
-    resp = await client.post(
-        "/api/v1/auth/login",
-        json={"email": email, "password": password, "captcha": captcha_answer},
+    # Verify email - this stores the user into the database!
+    v_resp = await client.post(
+        "/api/v1/auth/verify-email",
+        json={"token": token},
     )
-    assert resp.status_code == 200, resp.text
-    return resp.json()
+    assert v_resp.status_code == 200, v_resp.text
+    return v_resp.json()
+
