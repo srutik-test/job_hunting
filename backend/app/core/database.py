@@ -72,6 +72,12 @@ def _sync_sqlite_schema(sync_conn) -> None:
             sync_conn.execute(
                 text("ALTER TABLE companies ADD COLUMN meta TEXT DEFAULT '{}'")
             )
+    if "hr_contacts" in tables:
+        cols = {c["name"] for c in inspector.get_columns("hr_contacts")}
+        if "phone" not in cols:
+            sync_conn.execute(
+                text("ALTER TABLE hr_contacts ADD COLUMN phone VARCHAR(50) DEFAULT NULL")
+            )
 
 
 async def init_db() -> None:

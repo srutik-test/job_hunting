@@ -53,20 +53,27 @@ class Search(Base):
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
 
-    user = relationship("User", back_populates="searches")
-    company = relationship("Company", back_populates="searches")
+    user = relationship("User", back_populates="searches", lazy="selectin")
+    company = relationship("Company", back_populates="searches", lazy="selectin")
     contacts = relationship(
-        "HRContact", back_populates="search", cascade="all, delete-orphan"
+        "HRContact",
+        back_populates="search",
+        cascade="all, delete-orphan",
+        lazy="selectin",
     )
     logs = relationship(
-        "SearchLog", back_populates="search", cascade="all, delete-orphan"
+        "SearchLog",
+        back_populates="search",
+        cascade="all, delete-orphan",
+        lazy="selectin",
     )
 
     def to_dict(self) -> dict:
+        comp = self.__dict__.get("company")
         return {
             "id": self.id,
             "company_id": self.company_id,
-            "company": self.company.to_dict() if self.company else None,
+            "company": comp.to_dict() if comp and hasattr(comp, "to_dict") else None,
             "status": self.status,
             "current_step": self.current_step or "",
             "progress_pct": self.progress_pct,

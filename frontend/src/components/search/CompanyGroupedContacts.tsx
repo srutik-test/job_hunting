@@ -16,6 +16,7 @@ import {
   Loader2,
   Mail,
   MapPin,
+  Phone,
   Square,
   Trash2,
   User as UserIcon,
@@ -456,8 +457,8 @@ export default function CompanyGroupedContacts({
                                 <CategoryBadge category={c.contact_category} />
                               </div>
 
-                              {(c.name || c.designation) && (
-                                <div className="text-xs text-slate-700 dark:text-slate-300 flex items-center space-x-1.5">
+                              {(c.name || c.designation || c.phone) && (
+                                <div className="text-xs text-slate-700 dark:text-slate-300 flex flex-wrap items-center gap-1.5">
                                   {c.name && (
                                     <span className="font-bold">{c.name}</span>
                                   )}
@@ -467,6 +468,12 @@ export default function CompanyGroupedContacts({
                                   {c.designation && (
                                     <span className="text-slate-600 dark:text-slate-400 font-medium">
                                       {c.designation}
+                                    </span>
+                                  )}
+                                  {c.phone && (
+                                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                      <Phone className="h-2.5 w-2.5" />
+                                      <span>{c.phone}</span>
                                     </span>
                                   )}
                                 </div>

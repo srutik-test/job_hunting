@@ -30,6 +30,7 @@ def _row_for(contact: HRContact, company: Company) -> dict:
     return {
         "company_name": company.name,
         "email": contact.email,
+        "phone": contact.phone or "",
         "website": company.website,
         "linkedin_url": contact.linkedin_url or company.linkedin_url or "",
         "location": company.location or "",

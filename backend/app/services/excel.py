@@ -23,6 +23,7 @@ from app.schemas.domain import CompanyInput
 EXPORT_HEADERS = [
     "Company Name",
     "HR Mails",
+    "Phone Number",
     "Company Website",
     "LinkedIn URL",
     "Location",
@@ -46,14 +47,16 @@ def build_results_workbook(rows: List[dict]) -> bytes:
 
     for r, row in enumerate(rows, start=2):
         email = row.get("email")
+        phone = row.get("phone")
         ws.cell(row=r, column=1, value=row.get("company_name", ""))
         ws.cell(row=r, column=2, value=email if email else "No email evidence")
-        ws.cell(row=r, column=3, value=row.get("website", ""))
-        ws.cell(row=r, column=4, value=row.get("linkedin_url") or "-")
-        ws.cell(row=r, column=5, value=row.get("location", ""))
+        ws.cell(row=r, column=3, value=phone if phone else "-")
+        ws.cell(row=r, column=4, value=row.get("website", ""))
+        ws.cell(row=r, column=5, value=row.get("linkedin_url") or "-")
+        ws.cell(row=r, column=6, value=row.get("location", ""))
 
     for idx, header in enumerate(EXPORT_HEADERS, start=1):
-        width = max(len(header) + 6, 22)
+        width = max(len(header) + 6, 20)
         ws.column_dimensions[get_column_letter(idx)].width = width
     ws.freeze_panes = "A2"
 
@@ -87,9 +90,19 @@ def _match_column(header: str) -> str | None:
     return None
 
 
+def canonical_company_key(name: str, website: str) -> tuple[str, str]:
+    from app.services.orchestrator import normalize_website, domain_of
+
+    clean_name = " ".join(str(name or "").strip().lower().split())
+    norm_url = normalize_website(website) or str(website or "").strip().lower()
+    dom = domain_of(norm_url)
+    return (clean_name, dom)
+
+
 def parse_companies_from_file(content: bytes, filename: str) -> List[CompanyInput]:
-    """Parse an xlsx/csv upload into validated CompanyInput rows."""
+    """Parse an xlsx/csv upload into validated, deduplicated CompanyInput rows."""
     import pandas as pd
+    from app.services.orchestrator import normalize_website
 
     name_l = (filename or "").lower()
     try:
@@ -114,15 +127,24 @@ def parse_companies_from_file(content: bytes, filename: str) -> List[CompanyInpu
         )
 
     out: List[CompanyInput] = []
+    seen_keys: set[tuple[str, str]] = set()
+
     for _, row in df.iterrows():
         name = str(row.get("name", "")).strip()
         website = str(row.get("website", "")).strip()
         if not name or name.lower() == "nan" or not website or website.lower() == "nan":
             continue
+
+        norm_website = normalize_website(website) or website.strip().rstrip("/")
+        key = canonical_company_key(name, norm_website)
+        if key in seen_keys:
+            continue  # Keep the first occurrence only
+        seen_keys.add(key)
+
         out.append(
             CompanyInput(
                 name=name[:255],
-                website=website[:1024],
+                website=norm_website[:1024],
                 location=(
                     str(row.get("location", "")).strip()
                     if str(row.get("location", "")) != "nan"

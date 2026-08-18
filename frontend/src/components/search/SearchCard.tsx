@@ -1,17 +1,19 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import {
   AlertOctagon,
   CheckCircle2,
   Loader2,
   MinusCircle,
+  RotateCw,
   SearchX,
   Timer,
   XCircle,
 } from "lucide-react";
 import type { Search, SearchStatus } from "../../lib/types";
+import { formatDateWithTz, DEFAULT_TIMEZONE } from "../../lib/timezones";
 import { clsx } from "clsx";
 
 export const STATUS_META: Record<
@@ -20,7 +22,7 @@ export const STATUS_META: Record<
 > = {
   pending: {
     label: "Pending",
-    cls: "bg-slate-500/10 text-slate-500 ring-slate-500/20",
+    cls: "bg-amber-500/10 text-amber-500 ring-amber-500/20",
     Icon: Timer,
   },
   processing: {
@@ -45,7 +47,7 @@ export const STATUS_META: Record<
   },
   cancelled: {
     label: "Cancelled",
-    cls: "bg-slate-500/10 text-slate-500 ring-slate-500/20",
+    cls: "bg-zinc-500/10 text-zinc-500 ring-zinc-500/20",
     Icon: MinusCircle,
   },
 };
@@ -70,34 +72,84 @@ export function StatusChip({ status }: { status: SearchStatus }) {
   );
 }
 
-export default function SearchCard({ search }: { search: Search }) {
+interface SearchCardProps {
+  search: Search;
+  timezone?: string;
+  activeFilter?: string;
+  onRestart?: (searchId: string) => Promise<void>;
+}
+
+export default function SearchCard({
+  search,
+  timezone = DEFAULT_TIMEZONE,
+  activeFilter,
+  onRestart,
+}: SearchCardProps) {
+  const [restarting, setRestarting] = useState(false);
+
+  const handleRestartClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (restarting || !onRestart) return;
+    try {
+      setRestarting(true);
+      await onRestart(search.id);
+    } finally {
+      setRestarting(false);
+    }
+  };
+
+  const detailUrl = `/searches/${search.id}${
+    activeFilter ? `?filter=${encodeURIComponent(activeFilter)}` : ""
+  }`;
+
   return (
     <Link
-      href={`/searches/${search.id}`}
-      className="block rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm hover:border-blue-400 dark:hover:border-blue-600 hover:shadow-md transition"
+      href={detailUrl}
+      className="group block rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm hover:border-blue-400 dark:hover:border-blue-600 hover:shadow-md transition"
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-semibold text-slate-900 dark:text-white truncate">
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-slate-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">
             {search.company?.name || "Unknown company"}
           </p>
           <p className="text-xs text-slate-400 truncate">
             {search.company?.website}
           </p>
         </div>
-        <StatusChip status={search.status} />
+
+        <div className="flex items-center gap-2 shrink-0">
+          {onRestart && (
+            <button
+              type="button"
+              onClick={handleRestartClick}
+              disabled={restarting || search.status === "processing"}
+              title="Again search for HR contacts"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-[11px] font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-blue-50/50 dark:hover:bg-blue-950/30 transition disabled:opacity-40 cursor-pointer"
+            >
+              <RotateCw
+                className={clsx(
+                  "h-3 w-3",
+                  (restarting || search.status === "processing") && "animate-spin text-blue-500",
+                )}
+              />
+              <span className="hidden sm:inline">Again search</span>
+            </button>
+          )}
+          <StatusChip status={search.status} />
+        </div>
       </div>
 
       {(search.status === "processing" || search.status === "pending") && (
         <div className="mt-3 space-y-1">
           <div className="h-1.5 w-full rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
             <div
-              className="h-full rounded-full bg-blue-500 transition-all"
-              style={{ width: `${search.progress_pct}%` }}
+              className="h-full rounded-full bg-blue-500 transition-all duration-300"
+              style={{ width: `${Math.max(search.progress_pct, 5)}%` }}
             />
           </div>
           <p className="text-[11px] text-slate-400 truncate">
-            {search.current_step}
+            {search.current_step || (search.status === "pending" ? "Queued in worker..." : "Analyzing website...")}
           </p>
         </div>
       )}
@@ -119,10 +171,8 @@ export default function SearchCard({ search }: { search: Search }) {
           {search.pages_crawled} pages · {search.emails_found} emails ·{" "}
           {search.profiles_found} profiles
         </span>
-        <span>
-          {search.created_at
-            ? new Date(search.created_at).toLocaleString()
-            : ""}
+        <span title={`Timezone: ${timezone}`}>
+          {formatDateWithTz(search.created_at, timezone)}
         </span>
       </div>
     </Link>

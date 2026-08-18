@@ -11,7 +11,7 @@ import pytest_asyncio
 from httpx import MockTransport, Response
 
 from app.services.crawler.base import CrawlResult
-from tests.conftest import register_and_verify
+from .conftest import register_and_verify
 
 CONTACT_HTML = b"""
 <html><head><title>Contact - BetaWorks Careers</title></head><body>

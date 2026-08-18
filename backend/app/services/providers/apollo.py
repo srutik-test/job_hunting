@@ -98,7 +98,7 @@ class ApolloProvider(CapabilityProvider):
                     "page": 1,
                 }
                 resp = await client.post(
-                    f"{self._base}/v1/mixed_people/search",
+                    f"{self._base}/v1/organizations/search",
                     headers={"X-Api-Key": key, "Content-Type": "application/json"},
                     json=payload,
                 )

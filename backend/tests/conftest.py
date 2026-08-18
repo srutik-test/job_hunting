@@ -6,7 +6,11 @@ import sys
 from typing import AsyncGenerator
 
 import pytest
-import pytest_asyncio
+try:
+    import pytest_asyncio
+    async_fixture = pytest_asyncio.fixture
+except ImportError:
+    async_fixture = pytest.fixture
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -25,6 +29,11 @@ from app.core.config import settings
 settings.SMTP_HOST = None
 settings.SMTP_FROM = "no-reply@hr-platform.local"
 settings.DEBUG = True
+settings.FIRECRAWL_API_KEY = None
+settings.HUNTER_API_KEY = None
+settings.APOLLO_API_KEY = None
+settings.GOOGLE_SEARCH_API_KEY = None
+settings.GOOGLE_SEARCH_ENGINE_ID = None
 
 from app.core.database import Base, get_db  # noqa: E402
 from app import models  # noqa: F401, E402
@@ -44,7 +53,7 @@ def event_loop():
     loop.close()
 
 
-@pytest_asyncio.fixture(scope="function")
+@async_fixture(scope="function")
 async def client(tmp_path) -> AsyncGenerator:
     db_path = tmp_path / "test.db"
     url = f"sqlite+aiosqlite:///{db_path}"

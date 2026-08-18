@@ -13,9 +13,10 @@ class CrawledPage(BaseModel):
     links: List[str] = []
     page_type: str = "general"
     emails: List[str] = []
+    phones: List[str] = []
     linkedin_urls: List[str] = []
     meta_description: str = ""
-    json_ld: List[Dict[str, Any]] = []
+    json_ld: List[Any] = []
     # emails paired with their surrounding text context (for HR classification)
     email_contexts: List[Dict[str, str]] = []
 
@@ -26,6 +27,7 @@ class CrawlResult(BaseModel):
     pages: List[CrawledPage] = []
     pages_crawled: int = 0
     all_emails: Set[str] = set()
+    all_phones: Set[str] = set()
     all_linkedin_urls: Set[str] = set()
     sitemap_found: bool = False
     robots_disallowed: int = 0

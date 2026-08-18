@@ -101,6 +101,8 @@ class SearchOrchestrator:
         self.cancelled = False
         self.provider_manager = ProviderManager(db, search.user_id)
         self._persisted_emails: set[str] = set()
+        self._crawl_phones: list[str] = []
+        self._crawl_pages: list = []
 
     @staticmethod
     def _emails_in_text(text: str) -> set[str]:
@@ -109,12 +111,12 @@ class SearchOrchestrator:
             return set()
         found: set[str] = set()
         for em in EMAIL_REGEX.findall(text):
-            cleaned = em.strip().lower().rstrip(".,;:'\"()[]{}<>")
+            cleaned = em.strip().lower().rstrip(".,;:'\"()[]{}<>!?-")
             if valid_email_candidate(cleaned):
                 found.add(cleaned)
         for match in OBFUSCATED.finditer(text):
             u, d, t = match.groups()
-            cand = f"{u}@{d}.{t}".strip().lower().rstrip(".,;:'\"()[]{}<>")
+            cand = f"{u}@{d}.{t}".strip().lower().rstrip(".,;:'\"()[]{}<>!?-")
             if valid_email_candidate(cand):
                 found.add(cand)
         return found
@@ -356,6 +358,14 @@ class SearchOrchestrator:
                     "✕ All crawling strategies failed for this website", "error"
                 )
 
+        self._crawl_pages = crawl.pages
+        if crawl.all_phones:
+            self._crawl_phones = sorted(crawl.all_phones)
+            await self.log(
+                f"✓ {len(crawl.all_phones)} company phone number(s) discovered: {', '.join(self._crawl_phones[:3])}",
+                "info",
+            )
+
         # Report relevant pages
         for p in crawl.pages:
             if p.page_type in ("careers", "contact", "people", "team"):
@@ -497,7 +507,11 @@ class SearchOrchestrator:
                 for em in self._emails_in_text(hit.snippet + " " + hit.title):
                     if domain_of("https://" + em.split("@")[-1]).endswith(base_domain):
                         level = await verify_email_local(em)
-                        if level == VerificationLevel.INVALID:
+                        if level not in (
+                            VerificationLevel.MX_OK,
+                            VerificationLevel.SMTP_OK,
+                            VerificationLevel.DOMAIN_OK,
+                        ):
                             continue
                         cand = classify_email(em, "general", hit.url, hit.snippet)
                         status, category, conf, _ = score_for_email(
@@ -568,7 +582,11 @@ class SearchOrchestrator:
             if not fe.email:
                 continue
             level = await verify_email_local(fe.email)
-            if level == VerificationLevel.INVALID:
+            if level not in (
+                VerificationLevel.MX_OK,
+                VerificationLevel.SMTP_OK,
+                VerificationLevel.DOMAIN_OK,
+            ) and not fe.provider_verified:
                 continue
             cand = classify_email(
                 fe.email, "general", fe.source_url or "", fe.position or ""
@@ -633,7 +651,11 @@ class SearchOrchestrator:
             status, category, conf = "unverified", "linkedin", 0
             if person.email:
                 level = await verify_email_local(person.email)
-                if level != VerificationLevel.INVALID:
+                if level in (
+                    VerificationLevel.MX_OK,
+                    VerificationLevel.SMTP_OK,
+                    VerificationLevel.DOMAIN_OK,
+                ) or person.email_verified:
                     cand = classify_email(person.email, "people", "", person.job_title)
                     status, category, conf, _ = score_for_email(
                         cand,
@@ -676,6 +698,12 @@ class SearchOrchestrator:
     ) -> None:
         for cand in hr_evidence:
             level = verified_map.get(cand.email, VerificationLevel.SYNTAX_ONLY)
+            if level not in (
+                VerificationLevel.MX_OK,
+                VerificationLevel.SMTP_OK,
+                VerificationLevel.DOMAIN_OK,
+            ) and not hunter_verified.get(cand.email, False):
+                continue
             status, category, conf, _ = score_for_email(
                 cand,
                 level,
@@ -684,10 +712,15 @@ class SearchOrchestrator:
             )
             if not await self._record_email(cand.email):
                 continue
+            phone = (
+                (cand.source_url and next((p.phones[0] for p in self._crawl_pages if p.url == cand.source_url and p.phones), None))
+                or (self._crawl_phones[0] if self._crawl_phones else None)
+            )
             await self.save_contact(
                 email=cand.email,
                 name=None,
                 designation=None,
+                phone=phone,
                 linkedin_url=None,
                 source_type="company_website",
                 source_url=cand.source_url,
@@ -711,15 +744,24 @@ class SearchOrchestrator:
             if is_hr_related(cand):
                 continue  # company buckets only for non-HR
             level = verified_map.get(cand.email)
-            if level in (None, VerificationLevel.INVALID):
+            if level not in (
+                VerificationLevel.MX_OK,
+                VerificationLevel.SMTP_OK,
+                VerificationLevel.DOMAIN_OK,
+            ):
                 continue
             status, category, conf, _ = score_for_email(cand, level, "company_website")
             if not await self._record_email(cand.email):
                 continue
+            phone = (
+                (cand.source_url and next((p.phones[0] for p in self._crawl_pages if p.url == cand.source_url and p.phones), None))
+                or (self._crawl_phones[0] if self._crawl_phones else None)
+            )
             await self.save_contact(
                 email=cand.email,
                 name=None,
                 designation=None,
+                phone=phone,
                 linkedin_url=None,
                 source_type="company_website",
                 source_url=cand.source_url,
@@ -782,10 +824,12 @@ class SearchOrchestrator:
                         email = p.email
                 if email and not await self._record_email(email):
                     continue
+                phone = p.phone or (page.phones[0] if page.phones else (self._crawl_phones[0] if self._crawl_phones else None))
                 await self.save_contact(
                     email=email,
                     name=p.name,
                     designation=p.job_title,
+                    phone=phone,
                     linkedin_url=p.linkedin_profile_url,
                     source_type="company_website",
                     source_url=p.source_url,

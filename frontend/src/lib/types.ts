@@ -61,6 +61,7 @@ export interface Contact {
   name?: string | null;
   designation?: string | null;
   email?: string | null;
+  phone?: string | null;
   linkedin_url?: string | null;
   source_type: string;
   source_url?: string | null;

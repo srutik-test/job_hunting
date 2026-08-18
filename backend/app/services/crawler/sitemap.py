@@ -10,7 +10,7 @@ from app.services.crawler.page_classifier import get_url_crawl_priority
 
 
 class SitemapParser:
-    def __init__(self, timeout: float = 10.0, user_agent: str = ""):
+    def __init__(self, timeout: float = 30.0, user_agent: str = ""):
         self.timeout = timeout
         self.headers = {
             "User-Agent": user_agent or "HR-Contact-Research/2.0",

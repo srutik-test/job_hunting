@@ -18,6 +18,8 @@ logging.getLogger("platform").setLevel(logging.INFO)
 async def lifespan(app: FastAPI):
     logger.info("Initializing database schema (SQLite fallback path)...")
     await init_db()
+    from app.services.worker import SearchWorker
+    await SearchWorker.recover_pending_searches()
     logger.info("Platform ready.")
     yield
     logger.info("Shutting down.")

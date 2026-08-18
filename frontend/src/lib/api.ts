@@ -175,6 +175,10 @@ export const api = {
     });
   },
 
+  restartSearch(id: string): Promise<Search> {
+    return request(`/searches/${id}/restart`, { method: "POST" });
+  },
+
   cancelSearch(id: string): Promise<Search> {
     return request(`/searches/${id}/cancel`, { method: "POST" });
   },

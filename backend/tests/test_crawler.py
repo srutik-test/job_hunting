@@ -57,10 +57,19 @@ def test_crawl_priority():
 
 def test_valid_email_filtering():
     assert valid_email_candidate("hr@alphatech.io")
+    assert valid_email_candidate("careers@stripe.com")
+    assert not valid_email_candidate("careers@company.com")
     assert not valid_email_candidate("u12345@alphatech.sentry.io")
     assert not valid_email_candidate("image@2x.png")
     assert not valid_email_candidate("name@example.com")
     assert not valid_email_candidate("a@b")
+    # Prose sentence false positives must be rejected
+    assert not valid_email_candidate("broken@customers.explore")
+    assert not valid_email_candidate("workloads@scale.we")
+    assert not valid_email_candidate("up@night.before")
+    assert not valid_email_candidate("disappear@handoff.we")
+    assert not valid_email_candidate("property@scale.explore")
+    assert not valid_email_candidate("perform@scale.whether")
 
 
 def test_full_page_parse_extracts_real_emails_only():

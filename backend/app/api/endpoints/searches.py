@@ -1,6 +1,6 @@
-"""Search endpoints – start, monitor, list, cancel."""
+"""Search endpoints – start, monitor, list, cancel, restart."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -14,7 +14,7 @@ from fastapi import (
     File,
     status,
 )
-from sqlalchemy import func, select
+from sqlalchemy import func, select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -30,7 +30,7 @@ from app.schemas.domain import (
     StartSearchRequest,
 )
 from app.services.excel import parse_companies_from_file
-from app.services.orchestrator import normalize_website
+from app.services.orchestrator import normalize_website, domain_of
 from app.services.worker import SearchWorker
 
 router = APIRouter(prefix="/searches", tags=["Searches"])
@@ -44,47 +44,135 @@ def _search_response(search: Search, company: Optional[Company]) -> SearchRespon
     return SearchResponse(**data)
 
 
-async def _upsert_company(db: AsyncSession, user_id: str, data) -> Company:
-    website = normalize_website(data.website) or data.website.strip()
+async def _find_or_create_company(db: AsyncSession, user_id: str, data) -> Company:
+    norm_url = normalize_website(data.website) or str(data.website).strip().rstrip("/")
+    dom = domain_of(norm_url)
+    clean_name = " ".join(str(data.name).strip().lower().split())
+
+    # Look for existing company by user_id and matching domain/name
     res = await db.execute(
         select(Company).where(
             Company.user_id == user_id,
-            Company.website == website,
-            func.lower(Company.name) == data.name.strip().lower(),
+            func.lower(Company.name) == clean_name,
         )
     )
-    company = res.scalars().first()
+    matching_companies = res.scalars().all()
+    company = None
+    for c in matching_companies:
+        c_dom = domain_of(c.website)
+        if c_dom == dom:
+            company = c
+            break
+
     if company is None:
         company = Company(
             user_id=user_id,
-            name=data.name.strip()[:255],
-            website=website,
+            name=str(data.name).strip()[:255],
+            website=norm_url,
             location=(data.location or "")[:255],
             linkedin_url=(data.linkedin_url or "")[:1024],
             industry=(data.industry or "")[:255],
         )
         db.add(company)
         await db.flush()
+    else:
+        # Update metadata if new values are provided
+        if getattr(data, "location", None) and not company.location:
+            company.location = str(data.location)[:255]
+        if getattr(data, "linkedin_url", None) and not company.linkedin_url:
+            company.linkedin_url = str(data.linkedin_url)[:1024]
+        if getattr(data, "industry", None) and not company.industry:
+            company.industry = str(data.industry)[:255]
+        await db.flush()
     return company
 
 
 async def _create_and_start(db: AsyncSession, user: User, companies) -> list[Search]:
-    created: list[Search] = []
+    # 1. Deduplicate within the incoming batch list (keep first occurrence)
+    deduped_inputs = []
+    seen_batch_keys = set()
     for item in companies:
-        if not normalize_website(item.website):
+        norm = normalize_website(item.website)
+        if not norm:
             raise HTTPException(
                 status_code=422, detail=f"Invalid website URL for {item.name!r}."
             )
-        company = await _upsert_company(db, user.id, item)
-        search = Search(user_id=user.id, company_id=company.id, status="pending")
-        db.add(search)
-        created.append(search)
+        key = (" ".join(str(item.name).strip().lower().split()), domain_of(norm))
+        if key in seen_batch_keys:
+            continue
+        seen_batch_keys.add(key)
+        deduped_inputs.append(item)
+
+    searches_to_return: list[Search] = []
+    searches_to_start: list[str] = []
+
+    for item in deduped_inputs:
+        company = await _find_or_create_company(db, user.id, item)
+
+        # Check existing searches for this company and user
+        res = await db.execute(
+            select(Search)
+            .where(Search.user_id == user.id, Search.company_id == company.id)
+            .order_by(Search.created_at.desc())
+        )
+        existing_searches = res.scalars().all()
+
+        if existing_searches:
+            latest_search = existing_searches[0]
+            # If completed: skip duplicate entry without re-crawling
+            if latest_search.status == "completed":
+                searches_to_return.append(latest_search)
+                continue
+
+            # If in any other stage except completed: restart in the SAME card
+            latest_search.status = "pending"
+            latest_search.progress_pct = 0
+            latest_search.current_step = "Queued for processing"
+            latest_search.pages_crawled = 0
+            latest_search.emails_found = 0
+            latest_search.profiles_found = 0
+            latest_search.duration_seconds = 0.0
+            latest_search.error_message = None
+            latest_search.summary = None
+            latest_search.discovery_method = None
+            latest_search.started_at = None
+            latest_search.finished_at = None
+            latest_search.created_at = datetime.now(timezone.utc)
+
+            # Clear old logs and contacts for this search
+            await db.execute(
+                delete(SearchLog).where(SearchLog.search_id == latest_search.id)
+            )
+            await db.execute(
+                delete(HRContact).where(HRContact.search_id == latest_search.id)
+            )
+
+            # If there are any older search rows for this company, remove duplicates
+            for old_s in existing_searches[1:]:
+                await db.delete(old_s)
+
+            searches_to_return.append(latest_search)
+            searches_to_start.append(latest_search.id)
+        else:
+            # Create fresh search
+            search = Search(
+                user_id=user.id,
+                company_id=company.id,
+                status="pending",
+                current_step="Queued for processing",
+            )
+            db.add(search)
+            searches_to_return.append(search)
+            await db.flush()
+            searches_to_start.append(search.id)
+
     await db.commit()
-    for s in created:
+    for s in searches_to_return:
         await db.refresh(s)
-    for s in created:
-        SearchWorker.start(s.id)
-    return created
+    for sid in searches_to_start:
+        SearchWorker.start(sid)
+
+    return searches_to_return
 
 
 @router.post(
@@ -133,7 +221,7 @@ async def start_search_from_upload(
 @router.get("", response_model=list[SearchResponse])
 async def list_searches(
     status_filter: Optional[str] = Query(None, alias="status"),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(200, ge=1, le=500),
     offset: int = Query(0, ge=0),
     user: User = Depends(get_verified_user),
     db: AsyncSession = Depends(get_db),
@@ -143,13 +231,22 @@ async def list_searches(
         .join(Company, Company.id == Search.company_id)
         .where(Search.user_id == user.id)
         .order_by(Search.created_at.desc())
-        .limit(limit)
-        .offset(offset)
     )
     if status_filter:
         stmt = stmt.where(Search.status == status_filter)
     result = await db.execute(stmt)
-    return [_search_response(s, c) for s, c in result.all()]
+    all_rows = result.all()
+
+    # Deduplicate in response so each company only appears once (the latest search)
+    seen_companies = set()
+    deduped = []
+    for s, c in all_rows:
+        if c.id in seen_companies:
+            continue
+        seen_companies.add(c.id)
+        deduped.append(_search_response(s, c))
+
+    return deduped[offset : offset + limit]
 
 
 async def _get_owned_search(db: AsyncSession, user: User, search_id: str) -> Search:
@@ -204,6 +301,46 @@ async def get_search_contacts(
     return [ContactResponse(**c.to_dict()) for c in res.scalars().all()]
 
 
+@router.post("/{search_id}/restart", response_model=SearchResponse)
+async def restart_search(
+    search_id: str,
+    user: User = Depends(get_verified_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Restart a search from scratch on the same card."""
+    search = await _get_owned_search(db, user, search_id)
+
+    # Cancel any running task
+    SearchWorker.cancel(search.id)
+
+    # Reset search state
+    search.status = "pending"
+    search.progress_pct = 0
+    search.current_step = "Queued for processing"
+    search.pages_crawled = 0
+    search.emails_found = 0
+    search.profiles_found = 0
+    search.duration_seconds = 0.0
+    search.error_message = None
+    search.summary = None
+    search.discovery_method = None
+    search.started_at = None
+    search.finished_at = None
+    search.created_at = datetime.now(timezone.utc)
+
+    # Clear old logs and contacts
+    await db.execute(delete(SearchLog).where(SearchLog.search_id == search.id))
+    await db.execute(delete(HRContact).where(HRContact.search_id == search.id))
+    await db.commit()
+    await db.refresh(search)
+
+    # Start worker
+    SearchWorker.start(search.id)
+
+    res = await db.execute(select(Company).where(Company.id == search.company_id))
+    return _search_response(search, res.scalars().first())
+
+
 @router.post("/{search_id}/cancel", response_model=SearchResponse)
 async def cancel_search(
     search_id: str,
@@ -213,7 +350,7 @@ async def cancel_search(
     search = await _get_owned_search(db, user, search_id)
     if search.status in ("pending", "processing"):
         search.status = "cancelled"
-        search.finished_at = datetime.now()
+        search.finished_at = datetime.now(timezone.utc)
         await db.commit()
         SearchWorker.cancel(search.id)
     res = await db.execute(select(Company).where(Company.id == search.company_id))

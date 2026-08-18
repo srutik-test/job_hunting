@@ -47,6 +47,7 @@ class HRContact(Base):
     name = Column(String(255), nullable=True)  # None when unknown
     designation = Column(String(255), nullable=True)  # job title
     email = Column(String(320), nullable=True)  # None when no email evidence
+    phone = Column(String(50), nullable=True)
     linkedin_url = Column(String(1024), nullable=True)
 
     # provenance
@@ -79,6 +80,7 @@ class HRContact(Base):
             "name": self.name,
             "designation": self.designation,
             "email": self.email,
+            "phone": self.phone,
             "linkedin_url": self.linkedin_url,
             "source_type": self.source_type,
             "source_url": self.source_url,

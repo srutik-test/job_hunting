@@ -91,6 +91,16 @@ class BrowserCrawler:
                             wait_until="networkidle",
                             timeout=int(self.http.timeout * 1000),
                         )
+                        # Scroll down to bottom to trigger lazy-loaded footers and dynamic contact components
+                        try:
+                            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                            await page.wait_for_timeout(600)
+                            await page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
+                            await page.wait_for_timeout(300)
+                            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                            await page.wait_for_timeout(600)
+                        except Exception:
+                            pass
                         html = await page.content()
                         parsed = self.http._parse_page(url, 200, html, pre.base_domain)
                         pages.append(parsed)
@@ -103,11 +113,14 @@ class BrowserCrawler:
                     result.pages = pages
                     result.pages_crawled = len(pages)
                     all_em = set(pre.all_emails)
+                    all_ph = set(pre.all_phones)
                     all_li = set(pre.all_linkedin_urls)
                     for p in pages:
                         all_em.update(p.emails)
+                        all_ph.update(p.phones)
                         all_li.update(p.linkedin_urls)
                     result.all_emails = all_em
+                    result.all_phones = all_ph
                     result.all_linkedin_urls = all_li
                     result.needs_js = False
                     result.engine = self.engine

@@ -59,6 +59,7 @@ class DiscoveredPerson(BaseModel):
     source_url: str = ""
     linkedin_profile_url: Optional[str] = None
     email: Optional[str] = None  # only when present on the page/near context
+    phone: Optional[str] = None
     matched_via: str = "text"  # text | jsonld | email_context
 
 
@@ -136,6 +137,11 @@ def persons_from_jsonld(
                         for u in same_as:
                             if isinstance(u, str) and "linkedin.com/in/" in u:
                                 li = u
+                    phone = None
+                    if isinstance(node.get("telephone"), str):
+                        phone = node["telephone"].strip()
+                    elif isinstance(node.get("phone"), str):
+                        phone = node["phone"].strip()
                     people.append(
                         DiscoveredPerson(
                             name=name,
@@ -143,6 +149,7 @@ def persons_from_jsonld(
                             source_url=source_url,
                             linkedin_profile_url=li,
                             email=email,
+                            phone=phone,
                             matched_via="jsonld",
                         )
                     )

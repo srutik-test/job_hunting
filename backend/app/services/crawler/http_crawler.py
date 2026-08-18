@@ -29,15 +29,37 @@ from app.services.crawler.page_classifier import (
 )
 from app.services.crawler.sitemap import SitemapParser
 
-EMAIL_REGEX = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", re.I)
+EMAIL_REGEX = re.compile(
+    r"\b[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,24}\b",
+    re.I,
+)
 OBFUSCATED = re.compile(
-    r"([a-zA-Z0-9_.+-]+)\s*(?:\[at\]|\(at\)|\{at\}|\s+at\s+|\s+AT\s+|&#64;|&commat;)"
-    r"\s*([a-zA-Z0-9-]+)\s*(?:\[dot\]|\(dot\)|\{dot\}|\s+dot\s+|\.)\s*([a-zA-Z0-9-.]+)",
+    r"([a-zA-Z0-9_.+-]+)\s*(?:\[at\]|\(at\)|\{at\}|&#64;|&commat;)\s*([a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*)\s*(?:\[dot\]|\(dot\)|\{dot\}|&#46;)\s*([a-zA-Z]{2,24})",
     re.I,
 )
 EMAIL_ATTR_REGEX = re.compile(
     r'(?:data-email|data-mail|data-address)\s*=\s*["\']([^"\']+)["\']', re.I
 )
+PHONE_REGEX = re.compile(
+    r'(?:(?:\+|00)\d{1,3}[\s.-]?)?(?:\(?\d{2,5}\)?[\s.-]?)?\d{3,5}[\s.-]?\d{3,5}'
+)
+
+
+def valid_phone_candidate(phone_str: str) -> Optional[str]:
+    if not phone_str:
+        return None
+    raw = phone_str.strip()
+    digits = re.sub(r"\D", "", raw)
+    if len(digits) < 7 or len(digits) > 15:
+        return None
+    if len(set(digits)) <= 2:
+        return None
+    if digits in ("1234567", "12345678", "123456789", "1234567890", "9876543210"):
+        return None
+    cleaned = re.sub(r"[\s\t\r\n]+", " ", raw).strip()
+    return cleaned
+
+
 LINKEDIN_RE = re.compile(
     r"https?://(?:[\w.-]+\.)?linkedin\.com/(?:company|in|pub|school)/[a-zA-Z0-9_-]+/?",
     re.I,
@@ -86,6 +108,55 @@ IGNORED_DOMAINS = {
     "scale.frameworks",
 }
 
+# Recognized / IANA Top-Level Domains
+RECOGNIZED_TLDS = {
+    "com", "org", "net", "edu", "gov", "io", "co", "ai", "in", "uk", "de", "ca", "au", "fr",
+    "tech", "dev", "app", "agency", "global", "solutions", "services", "digital", "cloud",
+    "consulting", "info", "biz", "me", "us", "eu", "cc", "tv", "so", "sg", "hk", "ae", "sa",
+    "nl", "es", "it", "ch", "se", "no", "fi", "dk", "br", "mx", "jp", "kr", "cn", "tw", "za",
+    "nz", "ie", "pl", "cz", "at", "be", "ru", "ua", "ro", "gr", "pt", "ph", "my", "id", "th",
+    "vn", "ng", "ke", "eg", "pk", "bd", "lk", "careers", "jobs", "work", "team", "company",
+    "network", "group", "media", "design", "studio", "marketing", "software", "systems",
+    "ventures", "capital", "partners", "foundation", "academy", "institute", "school",
+    "university", "online", "site", "store", "shop", "pro", "club", "live", "world", "life",
+    "space", "link", "click", "help", "zone", "today", "email", "chat", "direct", "center",
+    "community", "expert", "guru", "ninja", "events", "guide", "tips", "management",
+    "properties", "legal", "financial", "finance", "health", "care", "clinic", "dental",
+    "doctor", "hospital", "security", "energy", "engineering", "construction", "contractors",
+    "builders", "cleaning", "catering", "restaurant", "travel", "tours", "flights", "hotel",
+    "realestate", "realty", "holdings", "enterprises", "international", "express", "delivery",
+    "logistics", "transport", "auto", "motor", "cars", "codes", "technology", "host",
+    "hosting", "server", "domains", "contact", "int", "mil", "mobi", "asia", "xxx", "post",
+    "co.in", "co.uk", "org.uk", "gov.in", "ac.uk", "edu.in", "gov.uk", "com.au", "net.au",
+    "co.nz", "com.sg", "co.za", "com.br", "co.jp", "ne.jp", "com.mx", "co.kr", "org.in", "gen.in"
+}
+
+# English words/stopwords that appear in text sentences that must NEVER be treated as TLDs
+ENGLISH_WORDS_NOT_TLDS = {
+    "we", "before", "explore", "whether", "handoff", "about", "after", "again", "against",
+    "all", "also", "and", "any", "because", "been", "being", "below", "between", "both",
+    "but", "can", "cannot", "could", "did", "does", "doing", "down", "during", "each",
+    "few", "for", "from", "further", "had", "has", "have", "having", "he", "her", "here",
+    "hers", "herself", "him", "himself", "his", "how", "into", "its", "itself",
+    "just", "more", "most", "myself", "nor", "not", "now", "off", "once", "only",
+    "other", "our", "ours", "ourselves", "out", "over", "own", "same", "she", "should",
+    "some", "such", "than", "that", "the", "their", "theirs", "them", "themselves", "then",
+    "there", "these", "they", "this", "those", "through", "too", "under", "until",
+    "very", "was", "were", "what", "when", "where", "which", "while", "who", "whom",
+    "why", "with", "would", "you", "your", "yours", "yourself", "yourselves", "customers",
+    "scale", "night", "property", "broken", "workloads", "disappear", "perform"
+}
+
+# Common noise words in text that should never be standalone email local parts
+FAKE_LOCAL_PARTS = {
+    "broken", "workloads", "up", "disappear", "property", "perform", "click", "read", "learn",
+    "view", "see", "get", "take", "make", "know", "think", "come", "give", "find", "tell",
+    "ask", "seem", "feel", "try", "leave", "call", "good", "new", "first", "last",
+    "long", "great", "little", "own", "other", "old", "right", "big", "high", "different",
+    "small", "large", "next", "early", "young", "important", "few", "public", "bad",
+    "same", "able", "example", "sample", "test", "demo", "placeholder"
+}
+
 VALID_TLD_REGEX = re.compile(r"^[a-zA-Z]{2,24}$")
 
 ProgressCallback = Optional[Callable[[Dict[str, Any]], Awaitable[Optional[bool]]]]
@@ -107,10 +178,10 @@ def decode_cloudflare_email(cfemail: str) -> Optional[str]:
 
 
 def valid_email_candidate(email: str, base_domain: Optional[str] = None) -> bool:
-    """Reject asset files, templates, CSS/JS artifacts, and noise domains."""
-    if not email or len(email) < 6 or len(email) > 100:
+    """Reject asset files, templates, CSS/JS artifacts, prose sentence matches, and fake noise domains."""
+    if not email or len(email) < 6 or len(email) > 90:
         return False
-    email = email.strip().lower().rstrip(".,;:'\"()[]{}<>")
+    email = email.strip().lower().rstrip(".,;:'\"()[]{}<>!?-")
     bad_endings = (
         ".png",
         ".jpg",
@@ -144,10 +215,30 @@ def valid_email_candidate(email: str, base_domain: Optional[str] = None) -> bool
     if not local or not domain or "." not in domain:
         return False
 
-    # Must have a valid alphabetic TLD
-    tld = domain.split(".")[-1]
-    if not VALID_TLD_REGEX.match(tld):
+    # Local part checks
+    if local.startswith(".") or local.endswith(".") or ".." in local:
         return False
+    if local in FAKE_LOCAL_PARTS:
+        return False
+
+    # Domain part checks
+    if domain.startswith((".", "-")) or domain.endswith((".", "-")) or ".." in domain:
+        return False
+
+    # Must have a valid alphabetic TLD
+    domain_parts = domain.split(".")
+    tld = domain_parts[-1]
+    if not VALID_TLD_REGEX.match(tld) or tld in ENGLISH_WORDS_NOT_TLDS:
+        return False
+
+    # Check recognized TLDs or valid ccTLD/gTLD
+    if tld not in RECOGNIZED_TLDS:
+        if len(domain_parts) >= 2:
+            two_part = f"{domain_parts[-2]}.{domain_parts[-1]}"
+            if two_part not in RECOGNIZED_TLDS and len(tld) > 4:
+                return False
+        else:
+            return False
 
     # Filter known noise / library domains
     if domain in IGNORED_DOMAINS or any(
@@ -162,7 +253,7 @@ def valid_email_candidate(email: str, base_domain: Optional[str] = None) -> bool
         return False
 
     # Check for placeholder template strings
-    if local in ("your-email", "youremail", "email-address", "name@domain"):
+    if local in ("your-email", "youremail", "email-address", "name@domain", "email", "username"):
         return False
 
     return True
@@ -173,7 +264,7 @@ class HttpCrawler:
 
     def __init__(
         self,
-        timeout: float = 15.0,
+        timeout: float = 30.0,
         max_pages: int = 30,
         user_agent: Optional[str] = None,
     ):
@@ -198,6 +289,7 @@ class HttpCrawler:
         queue: List[tuple[int, str]] = []
         pages: List[CrawledPage] = []
         all_emails: Set[str] = set()
+        all_phones: Set[str] = set()
         all_li: Set[str] = set()
         errors: List[str] = []
         robots_disallowed = 0
@@ -225,6 +317,9 @@ class HttpCrawler:
             for path in (
                 "/contact",
                 "/contact-us",
+                "/contactus",
+                "/get-in-touch",
+                "/reach-us",
                 "/careers",
                 "/career",
                 "/jobs",
@@ -239,6 +334,12 @@ class HttpCrawler:
                 "/recruitment",
                 "/work-with-us",
                 "/join-us",
+                "/connect",
+                "/offices",
+                "/locations",
+                "/support",
+                "/enquiry",
+                "/inquiry",
             ):
                 queue.append((90, urljoin(base_url, path)))
 
@@ -339,6 +440,7 @@ class HttpCrawler:
 
                 pages.append(page)
                 all_emails.update(page.emails)
+                all_phones.update(page.phones)
                 all_li.update(page.linkedin_urls)
 
                 # secondary internal links from the page
@@ -354,6 +456,7 @@ class HttpCrawler:
             pages=pages,
             pages_crawled=len(pages),
             all_emails=all_emails,
+            all_phones=all_phones,
             all_linkedin_urls=all_li,
             sitemap_found=sitemap_found,
             robots_disallowed=robots_disallowed,
@@ -389,7 +492,7 @@ class HttpCrawler:
     ) -> CrawledPage:
         soup = BeautifulSoup(html, "lxml") if html else None
         title, meta_desc = "", ""
-        json_ld: List[Dict[str, Any]] = []
+        json_ld: List[Any] = []
 
         if soup:
             if soup.title and soup.title.string:
@@ -403,7 +506,18 @@ class HttpCrawler:
                 try:
                     if tag.string:
                         data = json.loads(tag.string)
-                        json_ld.append(data)
+                        if isinstance(data, list):
+                            for item in data:
+                                if isinstance(item, dict):
+                                    json_ld.append(item)
+                                elif isinstance(item, list):
+                                    json_ld.extend([x for x in item if isinstance(x, dict)])
+                        elif isinstance(data, dict):
+                            if "@graph" in data and isinstance(data["@graph"], list):
+                                for item in data["@graph"]:
+                                    if isinstance(item, dict):
+                                        json_ld.append(item)
+                            json_ld.append(data)
                 except (ValueError, TypeError):
                     continue
 
@@ -411,6 +525,7 @@ class HttpCrawler:
 
         # ---- email extraction with context
         emails: Set[str] = set()
+        phones: Set[str] = set()
         contexts: List[Dict[str, str]] = []
 
         if soup:
@@ -446,7 +561,15 @@ class HttpCrawler:
                     )[:400]
                     contexts.append({"email": raw, "context": parent_text})
 
-            # 3) Attribute-based (data-email, data-mail, data-address)
+            # 3) tel: links
+            for a in soup.select('a[href^="tel:"]'):
+                href = a.get("href", "")
+                raw = href.replace("tel:", "").split("?")[0].strip()
+                cand_phone = valid_phone_candidate(raw)
+                if cand_phone:
+                    phones.add(cand_phone)
+
+            # 4) Attribute-based (data-email, data-mail, data-address, data-phone, data-tel)
             for tag in (
                 soup.find_all(attrs={"data-email": True})
                 + soup.find_all(attrs={"data-mail": True})
@@ -470,10 +593,19 @@ class HttpCrawler:
                     parent_text = " ".join(tag.get_text(" ", strip=True).split())[:400]
                     contexts.append({"email": val, "context": parent_text})
 
-        # 4) JSON-LD Person/Organization emails
-        self._jsonld_emails(json_ld, emails, base_domain)
+            for tag in soup.find_all(attrs={"data-phone": True}) + soup.find_all(
+                attrs={"data-tel": True}
+            ):
+                val = tag.get("data-phone") or tag.get("data-tel") or ""
+                cand_phone = valid_phone_candidate(val)
+                if cand_phone:
+                    phones.add(cand_phone)
 
-        # 5) Clean visible text extraction (after stripping script, style, svg, noscript, etc.)
+        # 5) JSON-LD Person/Organization emails & phones
+        self._jsonld_emails(json_ld, emails, base_domain)
+        self._jsonld_phones(json_ld, phones)
+
+        # 6) Clean visible text extraction (after stripping script, style, svg, noscript, etc.)
         visible_text = ""
         if soup:
             for junk in soup(
@@ -493,6 +625,11 @@ class HttpCrawler:
                 cand = f"{u}@{d}.{t}".strip().lower().rstrip(".,;:'\"()[]{}<>")
                 if valid_email_candidate(cand, base_domain):
                     emails.add(cand)
+
+            for pmatch in PHONE_REGEX.findall(visible_text):
+                cand_phone = valid_phone_candidate(pmatch)
+                if cand_phone:
+                    phones.add(cand_phone)
 
         # text context for emails found via regex (window search in visible text)
         for em in emails - {c["email"] for c in contexts}:
@@ -529,6 +666,7 @@ class HttpCrawler:
             links=list(links)[:200],
             page_type=page_type,
             emails=sorted(emails),
+            phones=sorted(phones)[:10],
             linkedin_urls=sorted(linkedin),
             meta_description=meta_desc,
             json_ld=json_ld,
@@ -550,3 +688,19 @@ class HttpCrawler:
         elif isinstance(data, list):
             for item in data:
                 HttpCrawler._jsonld_emails(item, out, base_domain)
+
+    @staticmethod
+    def _jsonld_phones(data: Any, out: Set[str]) -> None:
+        if isinstance(data, dict):
+            for k, v in data.items():
+                if k.lower() in ("telephone", "phone", "faxnumber") and isinstance(
+                    v, str
+                ):
+                    cand = valid_phone_candidate(v)
+                    if cand:
+                        out.add(cand)
+                elif isinstance(v, (dict, list)):
+                    HttpCrawler._jsonld_phones(v, out)
+        elif isinstance(data, list):
+            for item in data:
+                HttpCrawler._jsonld_phones(item, out)

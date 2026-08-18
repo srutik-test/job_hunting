@@ -2,7 +2,7 @@
 
 import pytest
 
-from tests.conftest import register_and_verify
+from .conftest import register_and_verify
 
 
 @pytest.mark.asyncio

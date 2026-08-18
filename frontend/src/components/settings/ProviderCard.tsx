@@ -188,16 +188,43 @@ export default function ProviderCard({
         </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <label className="flex items-center space-x-2 text-xs font-medium text-slate-600 dark:text-slate-300 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={enabled}
-            onChange={(e) => setEnabled(e.target.checked)}
-            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-          />
-          <span>{enabled ? "Enabled for searches" : "Disabled"}</span>
-        </label>
+      <div className="flex items-center justify-between pt-1">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={enabled}
+          onClick={() => setEnabled(!enabled)}
+          className="group flex items-center gap-3 focus:outline-none cursor-pointer"
+        >
+          <div
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+              enabled
+                ? "bg-emerald-500 shadow-sm shadow-emerald-500/20"
+                : "bg-slate-300 dark:bg-slate-700"
+            }`}
+          >
+            <span
+              aria-hidden="true"
+              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                enabled ? "translate-x-5" : "translate-x-0"
+              }`}
+            />
+          </div>
+          <div className="flex flex-col text-left">
+            <span
+              className={`text-xs font-semibold ${
+                enabled
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-slate-500 dark:text-slate-400"
+              }`}
+            >
+              {enabled ? "Channel Enabled" : "Channel Disabled"}
+            </span>
+            <span className="text-[10px] text-slate-400">
+              {enabled ? "Active in pipeline" : "Inactive in pipeline"}
+            </span>
+          </div>
+        </button>
         <div className="flex items-center space-x-2">
           <button
             onClick={test}
